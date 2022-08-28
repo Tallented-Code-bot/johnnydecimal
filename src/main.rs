@@ -1,4 +1,6 @@
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::fs;
 use walkdir::{DirEntry, WalkDir};
 
 fn main() {
@@ -7,21 +9,30 @@ fn main() {
 
 /// Create an index for a johnnydecimal system
 fn index() {
-    let re = Regex::new(r"\d{2}\.\d{2}.*$").unwrap();
+    let filepath = "jd/";
+    let mut system = System::new(); // create an empty JD system.
 
-    let walker = WalkDir::new("/home/gitpod/jd/").into_iter();
+    let walker = WalkDir::new(filepath).into_iter(); // Create a new filewalker.
     for entry in walker.filter_entry(|e| !is_hidden(e)) {
-        if re.is_match(entry.as_ref().unwrap().path().to_str().unwrap()) {
-            //println!("match: {}",entry.unwrap().path().display());
-            println!(
-                "{}",
-                re.find(entry.unwrap().path().to_str().unwrap())
-                    .unwrap()
-                    .as_str()
-            )
-        }
-        //println!("{}",entry.unwrap().path().display());
+        //Walk through every file and directory:
+        let path = entry.as_ref().unwrap().path().to_str().unwrap();
+        let jd_number: JdNumber = match JdNumber::try_from(String::from(path)) {
+            //check if it is a JD number,
+            Ok(number) => number,
+            Err(_err) => continue, //and if it is not, go to the next item.
+        };
+
+        println!("Indexing {}", jd_number);
+
+        system.add_id(jd_number, "Hello".to_string());
     }
+
+    fs::write(
+        format!("{}.JdIndex", filepath),
+        ron::to_string(&system).unwrap(),
+    )
+    .expect("Could not write file");
+    println!("Index has been written to {}.JdIndex", filepath);
 }
 
 /// Checks if a given file or directory is hidden.
@@ -35,7 +46,7 @@ fn is_hidden(entry: &DirEntry) -> bool {
         .unwrap_or(false)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct System {
     root: String,
     projects: Vec<String>,
@@ -52,12 +63,21 @@ impl System {
         self.id.push(id);
         self.title.push(name);
     }
+
+    fn new() -> Self {
+        System {
+            root: String::from("this_is_a_root"),
+            projects: Vec::new(),
+            id: Vec::new(),
+            title: Vec::new(),
+        }
+    }
 }
 
 /// A Johnny.Decimal number.
 ///
 /// Can be either `PRO.AC.ID` or `AC.ID`.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
 struct JdNumber {
     project: Option<u32>,
     category: u32,
@@ -73,6 +93,7 @@ impl JdNumber {
 
         match project {
             Some(project) => {
+                // If the project has more than 3 digits, error.
                 if project > 999 {
                     return Err(());
                 }
@@ -93,40 +114,11 @@ impl TryFrom<String> for JdNumber {
     type Error = ();
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        // regex:
-        //
-        // ----------  (\d{3}\.)?\d{2}\.\d{2}   -----------
-        // ((?:\d{3}\.)?\d{2}\.\d{2})(\D.*$)
-        //
-        // (?<=\d{2}.\d{2})\D.*$
-        //
-        println!("value:{}", value);
         let re = Regex::new(r"((?:\d{3}\.)?\d{2}\.\d{2})(\D.*$)").unwrap();
         let captures = match re.captures(&value) {
             Some(x) => x,
             None => return Err(()),
         };
-
-        let all_captures = captures.iter();
-        for i in all_captures {
-            println!(
-                "capture:{}",
-                match i {
-                    Some(x) => {
-                        x.as_str()
-                    }
-                    None => {
-                        "None"
-                    }
-                }
-            )
-        }
-
-        println!(
-            "value:{}, capture:{}",
-            value,
-            captures.get(0).unwrap().as_str()
-        );
 
         let numbers = captures.get(1).unwrap().as_str().split(".").into_iter();
         let label = captures.get(2).unwrap().as_str();
@@ -136,7 +128,6 @@ impl TryFrom<String> for JdNumber {
         //    return Err(());
         //}
 
-        //let numbers=value.split(".").into_iter();
         let mut new_numbers: Vec<u32> = Vec::new();
 
         // for each string in the generated list, parse it into

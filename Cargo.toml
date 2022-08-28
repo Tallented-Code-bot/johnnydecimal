@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 walkdir="2"
-serde="1.0.144"
+serde={version="1.0.144", features=["derive"]}
 regex="1"
+ron="0.8"
