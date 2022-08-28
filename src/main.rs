@@ -1,7 +1,7 @@
 use clap::Parser;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::{env, fs, path};
 use walkdir::{DirEntry, WalkDir};
 
 #[derive(Parser)]
@@ -13,25 +13,34 @@ struct Cli {
 #[derive(clap::Subcommand)]
 enum Action {
     /// Index an existing Johnny Decimal system
-    Index,
+    Index {
+        #[clap(parse(from_os_str))]
+        path: path::PathBuf,
+    },
+    Search {
+        term: String,
+    },
 }
 
 fn main() {
     let cli = Cli::parse();
 
     match cli.action {
-        Action::Index => {
-            index();
+        Action::Index { path } => {
+            index(path);
         }
+        Action::Search { term } => match search(&term) {
+            Ok(result) => println!("{}", result),
+            Err(message) => println!("{}", message),
+        },
     }
 }
 
 /// Create an index for a johnnydecimal system
-fn index() {
-    let filepath = "jd/";
+fn index(filepath: path::PathBuf) {
     let mut system = System::new(); // create an empty JD system.
 
-    let walker = WalkDir::new(filepath).into_iter(); // Create a new filewalker.
+    let walker = WalkDir::new(&filepath).into_iter(); // Create a new filewalker.
     for entry in walker.filter_entry(|e| !is_hidden(e)) {
         //Walk through every file and directory:
         let path = entry.as_ref().unwrap().path().to_str().unwrap();
@@ -47,11 +56,62 @@ fn index() {
     }
 
     fs::write(
-        format!("{}.JdIndex", filepath),
+        format!("{}.JdIndex", filepath.to_str().unwrap()),
         ron::to_string(&system).unwrap(),
     )
     .expect("Could not write file");
-    println!("Index has been written to {}.JdIndex", filepath);
+    println!(
+        "Index has been written to {}.JdIndex",
+        filepath.to_str().unwrap()
+    );
+}
+
+/// Find the jd index file
+// taken from https://codereview.stackexchange.com/questions/236743/find-a-file-in-current-or-parent-directories
+fn find_index() -> Option<String> {
+    let mut path = env::current_dir().unwrap();
+    let file = path::Path::new(".JdIndex");
+
+    loop {
+        path.push(file);
+
+        if path.is_file() {
+            break Some(fs::read_to_string(path).unwrap());
+        }
+
+        if !(path.pop() && path.pop()) {
+            break None;
+        }
+    }
+}
+
+/// Search for a johnny decimal number.
+fn search(search: &str) -> Result<String, &str> {
+    let search_number = match JdNumber::try_from(format!("{}_", search)) {
+        Ok(jd) => jd,
+        Err(_) => return Err("Search term was not a valid Johnny Decimal number"),
+    };
+
+    let index = match find_index() {
+        Some(index) => index,
+        None => return Err("Not in a valid Johnny Decimal system."),
+    };
+
+    let system: System = match ron::from_str(&index) {
+        Ok(x) => x,
+        Err(_) => return Err("Cannot read index file."),
+    };
+
+    // Regular linear search.  Sometime I might want to change this to a binary search.
+    for jd in system.id {
+        if jd.category == search_number.category
+            && jd.id == search_number.id
+            && jd.project == search_number.project
+        {
+            return Ok(jd.to_string());
+        }
+    }
+    return Err("Cannot find number");
 }
 
 /// Checks if a given file or directory is hidden.
@@ -90,6 +150,12 @@ impl System {
             id: Vec::new(),
             title: Vec::new(),
         }
+    }
+}
+
+impl std::fmt::Display for System {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
     }
 }
 
@@ -175,10 +241,14 @@ impl std::fmt::Display for JdNumber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.project {
             Some(project) => {
-                write!(f, "{}.{}.{}{}", project, self.category, self.id, self.label)
+                write!(
+                    f,
+                    "{:0>3}.{:0>2}.{:0>2}{}",
+                    project, self.category, self.id, self.label
+                )
             }
             None => {
-                write!(f, "{}.{}{}", self.category, self.id, self.label)
+                write!(f, "{:0>2}.{:0>2}{}", self.category, self.id, self.label)
             }
         }
     }
@@ -245,6 +315,12 @@ mod tests {
                 .unwrap()
                 .to_string(),
             "352.45.30_label"
+        );
+        assert_ne!(
+            JdNumber::try_from("05.02_label".to_string())
+                .unwrap()
+                .to_string(),
+            "5.2_label"
         );
     }
 }
