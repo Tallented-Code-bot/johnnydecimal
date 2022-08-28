@@ -1,10 +1,29 @@
+use clap::Parser;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use walkdir::{DirEntry, WalkDir};
 
+#[derive(Parser)]
+struct Cli {
+    #[clap(subcommand)]
+    action: Action,
+}
+
+#[derive(clap::Subcommand)]
+enum Action {
+    /// Index an existing Johnny Decimal system
+    Index,
+}
+
 fn main() {
-    index();
+    let cli = Cli::parse();
+
+    match cli.action {
+        Action::Index => {
+            index();
+        }
+    }
 }
 
 /// Create an index for a johnnydecimal system
