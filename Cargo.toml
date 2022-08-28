@@ -11,3 +11,8 @@ serde={version="1.0.144", features=["derive"]}
 regex="1"
 ron="0.8"
 clap={version="3.2.17",features=["derive"]}
+
+
+[[bin]]
+name="jd"
+path="src/main.rs"
