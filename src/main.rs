@@ -1,7 +1,7 @@
 use clap::Parser;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{env, fs, path};
+use std::{cmp, env, fs, path};
 use walkdir::{DirEntry, WalkDir};
 
 #[derive(Parser)]
@@ -38,7 +38,7 @@ fn main() {
 
 /// Create an index for a johnnydecimal system
 fn index(filepath: path::PathBuf) {
-    let mut system = System::new(); // create an empty JD system.
+    let mut system = System::new(filepath.clone()); // create an empty JD system.
 
     let walker = WalkDir::new(&filepath).into_iter(); // Create a new filewalker.
     for entry in walker.filter_entry(|e| !is_hidden(e)) {
@@ -54,6 +54,8 @@ fn index(filepath: path::PathBuf) {
 
         system.add_id(jd_number, "Hello".to_string());
     }
+
+    system.id.sort();
 
     fs::write(
         format!("{}.JdIndex", filepath.to_str().unwrap()),
@@ -127,7 +129,7 @@ fn is_hidden(entry: &DirEntry) -> bool {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct System {
-    root: String,
+    path: path::PathBuf,
     projects: Vec<String>,
     //area:Vec<String>,
     //category:Vec<String>,
@@ -143,9 +145,9 @@ impl System {
         self.title.push(name);
     }
 
-    fn new() -> Self {
+    fn new(path: path::PathBuf) -> Self {
         System {
-            root: String::from("this_is_a_root"),
+            path,
             projects: Vec::new(),
             id: Vec::new(),
             title: Vec::new(),
@@ -155,7 +157,12 @@ impl System {
 
 impl std::fmt::Display for System {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "")
+        let mut to_write = String::new();
+        for i in &self.id {
+            to_write.push_str(i.to_string().as_str());
+            to_write.push_str("\n");
+        }
+        write!(f, "{}", to_write)
     }
 }
 
@@ -168,9 +175,18 @@ struct JdNumber {
     category: u32,
     id: u32,
     label: String,
+    area_label: String,
+    category_label: String,
 }
 impl JdNumber {
-    fn new(category: u32, id: u32, project: Option<u32>, label: String) -> Result<Self, ()> {
+    fn new(
+        area_label: &str,
+        category_label: &str,
+        category: u32,
+        id: u32,
+        project: Option<u32>,
+        label: String,
+    ) -> Result<Self, ()> {
         // If the area or category are too long, return none
         if category > 99 || id > 99 {
             return Err(());
@@ -191,6 +207,8 @@ impl JdNumber {
             id,
             project,
             label,
+            area_label: area_label.to_string(),
+            category_label: category_label.to_string(),
         });
     }
 }
@@ -199,14 +217,17 @@ impl TryFrom<String> for JdNumber {
     type Error = ();
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let re = Regex::new(r"((?:\d{3}\.)?\d{2}\.\d{2})(\D.*$)").unwrap();
+        let re =
+            Regex::new(r"\d{2}-\d{2}(.*)/\d{2}(.*)/((?:\d{3}\.)?\d{2}\.\d{2})(\D.*$)").unwrap();
         let captures = match re.captures(&value) {
             Some(x) => x,
             None => return Err(()),
         };
 
-        let numbers = captures.get(1).unwrap().as_str().split(".").into_iter();
-        let label = captures.get(2).unwrap().as_str();
+        let numbers = captures.get(3).unwrap().as_str().split(".").into_iter();
+        let label = captures.get(4).unwrap().as_str();
+        let area_label = captures.get(1).unwrap().as_str();
+        let category_label = captures.get(2).unwrap().as_str();
 
         //check that there are periods in the number.
         //if !value.contains("."){
@@ -226,13 +247,22 @@ impl TryFrom<String> for JdNumber {
 
         if new_numbers.len() == 3 {
             return JdNumber::new(
+                area_label,
+                category_label,
                 new_numbers[1],
                 new_numbers[2],
                 Some(new_numbers[0]),
                 label.to_string(),
             );
         } else {
-            return JdNumber::new(new_numbers[0], new_numbers[1], None, label.to_string());
+            return JdNumber::new(
+                area_label,
+                category_label,
+                new_numbers[0],
+                new_numbers[1],
+                None,
+                label.to_string(),
+            );
         }
     }
 }
@@ -254,6 +284,47 @@ impl std::fmt::Display for JdNumber {
     }
 }
 
+impl Ord for JdNumber {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.category > other.category {
+            return cmp::Ordering::Greater;
+        }
+        if self.category < other.category {
+            return cmp::Ordering::Less;
+        }
+        //first number is equal
+        if self.id > other.id {
+            return cmp::Ordering::Greater;
+        }
+        if self.id < other.id {
+            return cmp::Ordering::Less;
+        }
+        cmp::Ordering::Equal
+    }
+}
+
+// Keep this implement block
+impl Eq for JdNumber {}
+
+impl PartialOrd for JdNumber {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        if self.category > other.category {
+            return Some(cmp::Ordering::Greater);
+        }
+        if self.category < other.category {
+            return Some(cmp::Ordering::Less);
+        }
+
+        if self.id > other.id {
+            return Some(cmp::Ordering::Greater);
+        }
+        if self.id < other.id {
+            return Some(cmp::Ordering::Less);
+        }
+        return Some(cmp::Ordering::Equal);
+    }
+}
+
 // v----------------------- TESTS----------------v
 #[cfg(test)]
 mod tests {
@@ -261,38 +332,44 @@ mod tests {
 
     #[test]
     fn test_jd_creation() {
-        assert!(JdNumber::new(100, 524, None, "fsd".to_string()).is_err());
-        assert!(JdNumber::new(43, 23, None, "sdf".to_string()).is_ok());
-        assert!(JdNumber::new(100, 52, Some(402), "_goodbye".to_string()).is_err());
-        assert!(JdNumber::new(52, 24, Some(2542), " hello".to_string()).is_err());
+        assert!(JdNumber::new("", "", 100, 524, None, "fsd".to_string()).is_err());
+        assert!(JdNumber::new("fsd", "fsd", 43, 23, None, "sdf".to_string()).is_ok());
+        assert!(JdNumber::new("slfd", "sdd", 100, 52, Some(402), "_goodbye".to_string()).is_err());
+        assert!(JdNumber::new("hi", "bye", 52, 24, Some(2542), " hello".to_string()).is_err());
     }
     #[test]
     fn test_jd_from_string() {
         assert_eq!(
-            JdNumber::try_from(String::from("20.35_test")).unwrap(),
+            JdNumber::try_from(String::from("20-29_testing/20_good_testing/20.35_test")).unwrap(),
             JdNumber {
                 category: 20,
                 id: 35,
                 project: None,
-                label: String::from("_test")
+                label: String::from("_test"),
+                category_label: String::from("_good_testing"),
+                area_label: String::from("_testing")
             }
         );
         assert_eq!(
-            JdNumber::try_from(String::from("50.32_label")).unwrap(),
+            JdNumber::try_from(String::from("50-59_hi/50_bye/50.32_label")).unwrap(),
             JdNumber {
                 category: 50,
                 id: 32,
                 project: None,
-                label: String::from("_label")
+                label: String::from("_label"),
+                area_label: String::from("_hi"),
+                category_label: String::from("_bye")
             }
         );
         assert_eq!(
-            JdNumber::try_from(String::from("423.62.21 hi")).unwrap(),
+            JdNumber::try_from(String::from("60-69/62/423.62.21 hi")).unwrap(),
             JdNumber {
                 category: 62,
                 id: 21,
                 project: Some(423),
-                label: String::from(" hi")
+                label: String::from(" hi"),
+                area_label: String::new(),
+                category_label: String::new()
             }
         );
         assert!(JdNumber::try_from(String::from("5032")).is_err());
@@ -305,19 +382,21 @@ mod tests {
     #[test]
     fn test_jd_display() {
         assert_eq!(
-            JdNumber::try_from(String::from("20.35_label"))
+            JdNumber::try_from(String::from("20-29_area/20_category/20.35_label"))
                 .unwrap()
                 .to_string(),
             "20.35_label"
         );
         assert_eq!(
-            JdNumber::try_from(String::from("352.45.30_label"))
-                .unwrap()
-                .to_string(),
+            JdNumber::try_from(String::from(
+                "300-399/project_area/352_project/40-49_area/45_category/352.45.30_label"
+            ))
+            .unwrap()
+            .to_string(),
             "352.45.30_label"
         );
         assert_ne!(
-            JdNumber::try_from("05.02_label".to_string())
+            JdNumber::try_from("00-09_area/05_category/05.02_label".to_string())
                 .unwrap()
                 .to_string(),
             "5.2_label"
