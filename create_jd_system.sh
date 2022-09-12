@@ -1,4 +1,4 @@
-cd /home/gitpod/
+# cd /home/gitpod/
 mkdir jd
 cd jd
 
