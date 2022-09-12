@@ -133,7 +133,7 @@ fn print_error<T>(input: Result<T, &str>) -> Result<T, ()> {
 }
 
 /// Create an index for a johnnydecimal system
-fn index(filepath: path::PathBuf) {
+fn index(mut filepath: path::PathBuf) {
     let mut system = System::new(filepath.clone().canonicalize().unwrap()); // create an empty JD system.
 
     let walker = WalkDir::new(&filepath).into_iter(); // Create a new filewalker.
@@ -161,15 +161,9 @@ fn index(filepath: path::PathBuf) {
         }
     }
 
-    fs::write(
-        format!("{}.JdIndex", filepath.to_str().unwrap()),
-        ron::to_string(&system).unwrap(),
-    )
-    .expect("Could not write file");
-    println!(
-        "Index has been written to {}.JdIndex",
-        filepath.to_str().unwrap()
-    );
+    filepath.push(".JdIndex");
+    fs::write(&filepath, ron::to_string(&system).unwrap()).expect("Could not write file");
+    println!("Index has been written to {}", filepath.display());
 }
 
 fn init(shell: InitShell) {
