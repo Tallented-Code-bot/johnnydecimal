@@ -176,8 +176,15 @@ function j
     pushd $(jd cd $argv)
 end"
         .to_string(),
+        InitShell::Bash => r#"
+function j(){
+    cd $(jd cd "$@")
+}
+"#
+        .to_string(),
         _ => {
-            format!("{} {}","Error:".magenta(),"Unsupported shell.  The list of supported shells is currently only fish.  More will be added eventually.")
+            format!("{} {}","Error:".magenta(),"Unsupported shell.  The list of supported shells is currently bash and fish.  More will be added eventually.")
+            // TODO Change error message when adding shells
         }
     };
 
