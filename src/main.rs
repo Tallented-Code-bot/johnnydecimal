@@ -182,8 +182,14 @@ function j(){
 }
 "#
         .to_string(),
+        InitShell::Zsh => r#"
+function j(){
+    cd $(jd cd "$@")
+}
+"#
+        .to_string(),
         _ => {
-            format!("{} {}","Error:".magenta(),"Unsupported shell.  The list of supported shells is currently bash and fish.  More will be added eventually.")
+            format!("{} {}","Error:".magenta(),"Unsupported shell.  The list of supported shells is currently bash, zsh, and fish.  More will be added eventually.")
             // TODO Change error message when adding shells
         }
     };

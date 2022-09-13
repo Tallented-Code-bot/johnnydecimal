@@ -55,5 +55,13 @@ Add this to your configuration, usually found at `~/.bashrc`.
 ``` sh
 eval "$(jd init bash)"
 ```
+</details>
 
+<details>
+<summary>Zsh</summary>
+Add this to your configuration, usually found at `~/.zshrc`.
+
+``` sh
+eval "$(jd init zsh)"
+```
 </details>
