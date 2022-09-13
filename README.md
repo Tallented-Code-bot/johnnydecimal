@@ -42,9 +42,18 @@ If you do not want this, you can skip it.
 <details>
 <summary>Fish</summary>
 
-Add this to your configuration, usually found at `~/.config/fish/config.fish`
+Add this to your configuration, usually found at `~/.config/fish/config.fish`.
 
 ``` fish
 jd init fish | source
 ```
+</details>
+<details>
+<summary>Bash</summary>
+Add this to your configuration, usually found at `~/.bashrc`.
+
+``` sh
+eval "$(jd init bash)"
+```
+
 </details>
