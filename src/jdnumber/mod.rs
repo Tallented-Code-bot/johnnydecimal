@@ -154,7 +154,7 @@ impl TryFrom<PathBuf> for JdNumber {
             Regex::new(r"^(\d\d\d)-(\d\d\d)(\D.*)$").expect("Hardcoded regex is valid.");
         let project_ex = Regex::new(r"^(\d\d\d)([^0-9.].*)$").expect("Hardcoded regex is valid.");
         let area_ex = Regex::new(r"^(\d\d)-(\d\d)(\D.*)$").expect("Hardcoded regex is valid.");
-        let category_ex = Regex::new(r"^(\d\d)(\D.*)$").expect("Hardcoded regex is valid.");
+        let category_ex = Regex::new(r"^(\d\d)([^0-9.].*)$").expect("Hardcoded regex is valid.");
         // let jd_ex =
         //     Regex::new(r"^(\d\d\d)?\.?(\d)(\d)\.(\d\d)(.*)$").expect("Hardcoded regex is valid.");
         let jd_ex = Regex::new(r"(?m)^(\d\d\d)?\.?(\d\d)\.(\d\d)(\D.*)$")
