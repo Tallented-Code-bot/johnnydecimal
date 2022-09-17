@@ -442,6 +442,20 @@ mod tests {
                 ))
             }
         );
+
+        assert!(JdNumber::check_exactly_equal(
+            JdNumber::try_from(PathBuf::from("10-19_finance/12_payroll/12.02_a_payroll")).unwrap(),
+            JdNumber {
+                category: 12,
+                id: 02,
+                project: None,
+                project_label: None,
+                label: String::from("_a_payroll"),
+                category_label: String::from("_payroll"),
+                area_label: String::from("_finance"),
+                path: Location::Path(PathBuf::from("10-19_finance/12_payroll/12.02_a_payroll"))
+            }
+        ));
         // assert_eq!(
         //     JdNumber::try_from(String::from("60-69/62/423.62.21 hi")).unwrap(),
         //     JdNumber {
@@ -542,4 +556,28 @@ mod tests {
 
         assert_eq!(jd_1, jd_1.clone());
     }
+
+    #[test]
+    fn test_exactly_equal(){
+        let jd_1 = JdNumber::new(
+            "area_label",
+            "cat_label",
+            50,
+            32,
+            None,
+            None,
+            "here".to_string(),
+            PathBuf::new(),
+        )
+        .unwrap();
+
+        let jd_2=JdNumber::new("area_label","cat_label",50,32,None,None,"here".to_string(),PathBuf::new()).unwrap();
+
+        assert!(JdNumber::check_exactly_equal(jd_1,jd_2.clone()));
+
+        let jd_3=JdNumber::new("area_2_label","cat_2_label",60,32,None,None,"here".to_string(),PathBuf::new()).unwrap();
+        assert!(!JdNumber::check_exactly_equal(jd_2,jd_3));
+
+    }
+
 }

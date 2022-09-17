@@ -7,7 +7,7 @@ use std::{
 };
 
 /// A location of a Johnny Decimal number.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize,PartialEq)]
 pub enum Location {
     Path(path::PathBuf),
 }
@@ -121,6 +121,21 @@ impl JdNumber {
         // path.push(self.label.clone());
         path
     }
+
+    /// Check if two Johnny Decimal numbers are exactly equal.
+    ///
+    /// This include the numbers, and **all** fields.  
+    pub fn check_exactly_equal(jd1: JdNumber, jd2: JdNumber) -> bool {
+        println!("{:?}\n{:?}\n\n",jd1,jd2);
+        return jd1.project == jd2.project
+            && jd1.project_label == jd2.project_label
+            && jd1.category == jd2.category
+            && jd1.id == jd2.id
+            && jd1.label == jd2.label
+            && jd1.area_label == jd2.area_label
+            && jd1.category_label == jd2.category_label
+            && jd1.path == jd2.path;
+    }
 }
 
 /// Create a johnny decimal number from a path.
@@ -139,7 +154,7 @@ impl TryFrom<PathBuf> for JdNumber {
             Regex::new(r"^(\d\d\d)-(\d\d\d)(\D.*)$").expect("Hardcoded regex is valid.");
         let project_ex = Regex::new(r"^(\d\d\d)([^0-9.].*)$").expect("Hardcoded regex is valid.");
         let area_ex = Regex::new(r"^(\d\d)-(\d\d)(\D.*)$").expect("Hardcoded regex is valid.");
-        let category_ex = Regex::new(r"^(\d\d)(\D.*)$").expect("Hardcoded regex is valid.");
+        let category_ex = Regex::new(r"^(\d\d)([^0-9.].*)$").expect("Hardcoded regex is valid.");
         // let jd_ex =
         //     Regex::new(r"^(\d\d\d)?\.?(\d)(\d)\.(\d\d)(.*)$").expect("Hardcoded regex is valid.");
         let jd_ex = Regex::new(r"(?m)^(\d\d\d)?\.?(\d\d)\.(\d\d)(\D.*)$")
