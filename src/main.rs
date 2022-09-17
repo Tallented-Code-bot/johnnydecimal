@@ -631,4 +631,30 @@ mod tests {
         .unwrap();
         assert!(!JdNumber::check_exactly_equal(jd_2, jd_3));
     }
+    #[test]
+    fn test_ord() {
+        // test project inequality
+        let jd_1 = JdNumber::try_from("102.22.05".to_string());
+        let jd_2 = JdNumber::try_from("101.22.05".to_string());
+        assert!(jd_1 > jd_2);
+        assert!(jd_2 < jd_1);
+
+        // test category inequality
+        let jd_3 = JdNumber::try_from("100.30.05".to_string());
+        let jd_4 = JdNumber::try_from("100.31.05".to_string());
+        assert!(jd_4 > jd_3);
+        assert!(jd_3 < jd_4);
+
+        // test id inequality
+        let jd_5 = JdNumber::try_from("300.50.03".to_string());
+        let jd_6 = JdNumber::try_from("300.50.02".to_string());
+        assert!(jd_5 > jd_6);
+        assert!(jd_6 < jd_5);
+
+        // test equality
+        let jd_7 = JdNumber::try_from("502.43.10".to_string());
+        let jd_8 = JdNumber::try_from("502.43.10".to_string());
+        assert_eq!(jd_7, jd_8);
+        assert_eq!(jd_8, jd_7);
+    }
 }

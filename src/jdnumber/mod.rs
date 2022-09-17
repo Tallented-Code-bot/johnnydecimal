@@ -140,7 +140,7 @@ impl JdNumber {
 
 /// Create a johnny decimal number from a path.
 impl TryFrom<PathBuf> for JdNumber {
-    type Error = ();
+    type Error = &'static str;
     // 20-29_testing/20_good_testing/20.35_test/
 
     fn try_from(path_value: PathBuf) -> Result<Self, Self::Error> {
@@ -166,7 +166,7 @@ impl TryFrom<PathBuf> for JdNumber {
         let mut project_name: Option<&str> = None;
         let mut project: Option<u32> = None;
         let mut area_name: Option<&str> = None;
-        let mut _area: Option<(&str, &str)> = None;
+        let mut area: Option<(u32, u32)> = None;
         let mut category: Option<u32> = None;
         let mut category_name: Option<&str> = None;
         let mut jd_project: Option<u32> = None;
@@ -199,7 +199,10 @@ impl TryFrom<PathBuf> for JdNumber {
 
             match area_ex.captures(component.as_os_str().to_str().unwrap()) {
                 Some(caps) => {
-                    _area = Some((caps.get(1).unwrap().as_str(), caps.get(2).unwrap().as_str()));
+                    area = Some((
+                        caps.get(1).unwrap().as_str().parse().unwrap(),
+                        caps.get(2).unwrap().as_str().parse().unwrap(),
+                    ));
                     // area_name = Some(caps.get(3).unwrap().as_str());
                     area_name = caps.get(3).map(|v| v.as_str());
                 }
@@ -227,23 +230,37 @@ impl TryFrom<PathBuf> for JdNumber {
         }
 
         if project != jd_project {
-            return Err(());
+            return Err("");
         }
 
         if category != jd_category {
-            return Err(());
+            return Err("");
         }
 
-        return JdNumber::new(
-            area_name.ok_or(())?,
-            category_name.ok_or(())?,
-            category.ok_or(())?,
-            jd_id.ok_or(())?,
+        // If the first area number is not a multiple
+        // of ten, error.
+        if area.ok_or("")?.0 % 10 != 0 {
+            return Err("First area number is not a multiple of 10.");
+        }
+        // if the second area number is not 9 more than the first one,
+        // error.
+        if area.ok_or("")?.1 != area.ok_or("")?.0 + 9 {
+            return Err("Second area number is not 9 more than the first number.");
+        }
+
+        return match JdNumber::new(
+            area_name.ok_or("Could not find area name")?,
+            category_name.ok_or("Could not find category name")?,
+            category.ok_or("Could not find category")?,
+            jd_id.ok_or("Could not find id")?,
             project,
             project_name.map(|p| p.to_string()),
-            jd_name.ok_or(())?.to_string(),
+            jd_name.ok_or("Could not find JD name")?.to_string(),
             path_value.clone(),
-        );
+        ) {
+            Ok(value) => Ok(value),
+            Err(_) => Err("Could not create JD number"),
+        };
     }
 }
 
@@ -317,13 +334,29 @@ impl std::fmt::Display for JdNumber {
 
 impl Ord for JdNumber {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.project.is_some() && other.project.is_some() {
+            // check which project is greater
+            if self.project.unwrap() > other.project.unwrap() {
+                return cmp::Ordering::Greater;
+            }
+            if self.project.unwrap() < other.project.unwrap() {
+                return cmp::Ordering::Less;
+            }
+        } else if self.project.is_some() && other.project.is_none() {
+            // some project trumps none
+            return cmp::Ordering::Greater;
+        } else if self.project.is_none() && other.project.is_some() {
+            return cmp::Ordering::Less;
+        }
+
+        // projects are guaranteed to be equal now.
         if self.category > other.category {
             return cmp::Ordering::Greater;
         }
         if self.category < other.category {
             return cmp::Ordering::Less;
         }
-        //first number is equal
+        // category has to be equal.
         if self.id > other.id {
             return cmp::Ordering::Greater;
         }
@@ -344,6 +377,19 @@ impl PartialEq for JdNumber {
 
 impl PartialOrd for JdNumber {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        if self.project.is_some() && other.project.is_some() {
+            if self.project.unwrap() > other.project.unwrap() {
+                return Some(cmp::Ordering::Greater);
+            }
+            if self.project.unwrap() < other.project.unwrap() {
+                return Some(cmp::Ordering::Less);
+            }
+        } else if self.project.is_some() && other.project.is_none() {
+            return Some(cmp::Ordering::Greater);
+        } else if self.project.is_none() && other.project.is_some() {
+            return Some(cmp::Ordering::Less);
+        }
+
         if self.category > other.category {
             return Some(cmp::Ordering::Greater);
         }
