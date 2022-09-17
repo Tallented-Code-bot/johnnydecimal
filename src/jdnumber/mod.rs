@@ -7,7 +7,7 @@ use std::{
 };
 
 /// A location of a Johnny Decimal number.
-#[derive(Clone, Debug, Serialize, Deserialize,PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Location {
     Path(path::PathBuf),
 }
@@ -126,7 +126,7 @@ impl JdNumber {
     ///
     /// This include the numbers, and **all** fields.  
     pub fn check_exactly_equal(jd1: JdNumber, jd2: JdNumber) -> bool {
-        println!("{:?}\n{:?}\n\n",jd1,jd2);
+        println!("{:?}\n{:?}\n\n", jd1, jd2);
         return jd1.project == jd2.project
             && jd1.project_label == jd2.project_label
             && jd1.category == jd2.category
@@ -244,6 +244,47 @@ impl TryFrom<PathBuf> for JdNumber {
             jd_name.ok_or(())?.to_string(),
             path_value.clone(),
         );
+    }
+}
+
+impl TryFrom<String> for JdNumber {
+    type Error = &'static str;
+
+    fn try_from(value: String) -> Result<Self, &'static str> {
+        // PRO.AC.ID or AC.ID
+        let ex = Regex::new(r"^(\d\d\d)?\.?(\d\d)\.(\d\d)$").expect("Hardcoded regex is valid.");
+        let project: Option<u32>;
+        let category: u32;
+        let id: u32;
+
+        match ex.captures(&value) {
+            Some(caps) => {
+                project = caps.get(1).map(|v| v.as_str().parse().unwrap());
+                category = caps
+                    .get(2)
+                    .map(|v| v.as_str().parse().unwrap())
+                    .ok_or("Could not get project.")?;
+                id = caps
+                    .get(3)
+                    .map(|v| v.as_str().parse().unwrap())
+                    .ok_or("Could not get id.")?;
+            }
+            None => return Err("Regex did not match"),
+        };
+
+        return match JdNumber::new(
+            "",
+            "",
+            category,
+            id,
+            project,
+            None,
+            "label".to_string(),
+            PathBuf::new(),
+        ) {
+            Ok(jd) => Ok(jd),
+            Err(_err) => Err("Could not create JD"),
+        };
     }
 }
 

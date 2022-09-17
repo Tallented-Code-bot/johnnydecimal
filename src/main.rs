@@ -107,7 +107,7 @@ fn main() -> Result<(), ()> {
             let system = print_error(get_system())?;
             println!("{}", system);
         }
-        Subcommand::Cd { term } => match go_to_jd(&term) {
+        Subcommand::Cd { term } => match go_to_jd(term) {
             Ok(_) => {}
             Err(message) => println!("{} {}", "Error:".magenta(), message),
         },
@@ -216,9 +216,10 @@ Here is what would normally be output:
     }
 }
 
-fn go_to_jd(jd: &str) -> Result<(), &str> {
+fn go_to_jd(input: String) -> Result<(), String> {
     let system = get_system()?;
-    let jd = search(jd)?;
+    let jd_term = JdNumber::try_from(input)?;
+    let jd = system.get_id(jd_term)?;
 
     // let path = format!(
     //     "{}/{}",
@@ -286,7 +287,7 @@ fn get_system() -> Result<System, &'static str> {
 }
 
 /// Search for a johnny decimal number.
-fn search(search: &str) -> Result<JdNumber, &str> {
+fn _search(search: &str) -> Result<JdNumber, &str> {
     let re = Regex::new(r"(\d{3})?\.?(\d{2})\.(\d{2})").unwrap();
 
     let captures = match re.captures(search) {
@@ -397,7 +398,7 @@ mod tests {
         .is_err());
     }
     #[test]
-    fn test_jd_from_string() {
+    fn test_jd_from_path() {
         assert_eq!(
             JdNumber::try_from(PathBuf::from("20-29_testing/20_good_testing/20.35_test")).unwrap(),
             JdNumber {
@@ -475,6 +476,38 @@ mod tests {
         assert!(JdNumber::try_from(PathBuf::from("20.43")).is_err());
         //assert!(JdNumber::try_from(String::from("500.42.31")).is_err());
     }
+
+    #[test]
+    fn test_jd_from_string() {
+        // Test PRO.AC.ID
+        assert_eq!(
+            JdNumber::try_from(String::from("192.13.42")).unwrap(),
+            JdNumber::new(
+                "",
+                "",
+                13,
+                42,
+                Some(192),
+                None,
+                "j".to_string(),
+                PathBuf::new()
+            )
+            .unwrap()
+        );
+
+        // test AC.ID
+        assert_eq!(
+            JdNumber::try_from(String::from("50.42")).unwrap(),
+            JdNumber::new("", "", 50, 42, None, None, "l".to_string(), PathBuf::new()).unwrap()
+        );
+
+        // test empty string
+        assert!(JdNumber::try_from(String::from("")).is_err());
+
+        // test giberish
+        assert!(JdNumber::try_from(String::from("this_is-some|giberish!")).is_err());
+    }
+
     #[test]
     fn test_jd_display() {
         assert_eq!(
@@ -558,7 +591,7 @@ mod tests {
     }
 
     #[test]
-    fn test_exactly_equal(){
+    fn test_exactly_equal() {
         let jd_1 = JdNumber::new(
             "area_label",
             "cat_label",
@@ -571,13 +604,31 @@ mod tests {
         )
         .unwrap();
 
-        let jd_2=JdNumber::new("area_label","cat_label",50,32,None,None,"here".to_string(),PathBuf::new()).unwrap();
+        let jd_2 = JdNumber::new(
+            "area_label",
+            "cat_label",
+            50,
+            32,
+            None,
+            None,
+            "here".to_string(),
+            PathBuf::new(),
+        )
+        .unwrap();
 
-        assert!(JdNumber::check_exactly_equal(jd_1,jd_2.clone()));
+        assert!(JdNumber::check_exactly_equal(jd_1, jd_2.clone()));
 
-        let jd_3=JdNumber::new("area_2_label","cat_2_label",60,32,None,None,"here".to_string(),PathBuf::new()).unwrap();
-        assert!(!JdNumber::check_exactly_equal(jd_2,jd_3));
-
+        let jd_3 = JdNumber::new(
+            "area_2_label",
+            "cat_2_label",
+            60,
+            32,
+            None,
+            None,
+            "here".to_string(),
+            PathBuf::new(),
+        )
+        .unwrap();
+        assert!(!JdNumber::check_exactly_equal(jd_2, jd_3));
     }
-
 }

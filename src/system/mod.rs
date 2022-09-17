@@ -192,6 +192,14 @@ impl System {
         return Ok(output);
     }
 
+    /// Get an id from the system.
+    pub fn get_id(&self, id: JdNumber) -> Result<JdNumber, &str> {
+        match self.id.binary_search(&id) {
+            Ok(index) => Ok(self.id[index].clone()),
+            Err(_) => Err("Could not find JD"),
+        }
+    }
+
     // /// Search for a value, using fuzzy search.
     // pub fn search(&self, input: String) {
     //     //let list: Vec<String> = self.id.clone().into_iter().map(|s| s.to_string()).collect();
@@ -442,5 +450,33 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
             system.show("").err().unwrap(),
             "Invalid search term.  Search term should be a valid JD number."
         );
+    }
+
+    #[test]
+    fn test_get_id() {
+        let system = create_sample_system();
+
+        let jd1 = JdNumber::try_from("12.01".to_string()).unwrap();
+        let jd2 = JdNumber::new(
+            "_finance",
+            "_payroll",
+            12,
+            01,
+            None,
+            None,
+            "_sept_payroll".to_string(),
+            PathBuf::from("jd/10-19_finance/12_payroll/12.01_sept_payroll"),
+        )
+        .unwrap();
+
+        assert!(JdNumber::check_exactly_equal(
+            system.get_id(jd1).unwrap(),
+            jd2
+        ));
+
+        let jd3 =
+            JdNumber::new("", "", 50, 32, None, None, "l".to_string(), PathBuf::new()).unwrap();
+
+        assert!(system.get_id(jd3).is_err());
     }
 }
