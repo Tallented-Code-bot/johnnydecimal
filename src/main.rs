@@ -25,8 +25,18 @@ enum Subcommand {
         #[clap(parse(from_os_str))]
         path: path::PathBuf,
     },
+    /// Show part or all of a Johnny Decimal system
     Show {
-        term: String,
+        /// The thing to show.
+        ///
+        /// This should be part or all of a Johnny Decimal number.
+        /// - PRO.AC.ID or AC.ID
+        /// - PRO
+        /// AC or PRO.AC
+        ///
+        /// If this is not given, or something other than acceptable values is given,
+        /// the whole Johnny Decimal system is shown.
+        item: Option<String>,
     },
     Display,
     Cd {
@@ -88,9 +98,9 @@ fn main() -> Result<(), ()> {
         Subcommand::Index { path } => {
             index(path);
         }
-        Subcommand::Show { term } => {
+        Subcommand::Show { item: term } => {
             let system = print_error(get_system())?;
-            let output = print_error(system.show(&term))?;
+            let output = print_error(system.display(term))?;
             println!("{}", output);
         }
         Subcommand::Display => {
@@ -186,6 +196,7 @@ function j(){
 function j(){
     cd $(jd cd "$@")
 }
+
 "#
         .to_string(),
         _ => {
@@ -335,7 +346,6 @@ mod tests {
     use std::path::PathBuf;
 
     use crate::JdNumber;
-    use colored::Colorize;
 
     use crate::jdnumber::Location;
 
@@ -457,7 +467,7 @@ mod tests {
             JdNumber::try_from(PathBuf::from("20-29_area/20_category/20.35_label"))
                 .unwrap()
                 .to_string(),
-            format!("{}.{}{}", "20".red(), "35".red(), "_label".red()) //"20.35_label"
+            format!("{}.{}{}", "20", "35", "_label") //"20.35_label"
         );
         assert_eq!(
             JdNumber::try_from(PathBuf::from(
@@ -465,20 +475,14 @@ mod tests {
             ))
             .unwrap()
             .to_string(),
-            format!(
-                "{}.{}.{}{}",
-                "352".red(),
-                "45".red(),
-                "30".red(),
-                "_label".red()
-            ) //"352.45.30_label"
+            format!("{}.{}.{}{}", "352", "45", "30", "_label") //"352.45.30_label"
         );
         assert_ne!(
             PathBuf::try_from("00-09_area/05_category/05.02_label".to_string())
                 .unwrap()
                 .display()
                 .to_string(),
-            format!("{}.{}{}", "5".red(), "2".red(), "_label".red()) //"5.2_label"
+            format!("{}.{}{}", "5", "2", "_label") //"5.2_label"
         );
     }
 

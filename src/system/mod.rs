@@ -63,6 +63,135 @@ impl System {
         };
     }
 
+    /// Display a johnny decimal system.
+    ///
+    /// The input should be a Johnny Decimal number, or a partial Johnny Decimal number.
+    /// The types of numbers can be:
+    /// - PRO.AC.ID or AC.ID
+    /// - PRO
+    /// - AC/PRO.AC
+    ///
+    /// For example,
+    /// `display(Some(String::from("50.43")))` should display the Johnny Decimal
+    /// `50.43`.
+    ///
+    /// If `None`, an empty string, or a string with some other giberish
+    /// is input, the whole Johnny Decimal system will be displayed.
+    pub fn display(&self, input: Option<String>) -> Result<String, &str> {
+        // PRO.AC or AC
+        let cat_ex = Regex::new(r"^(\d\d\d)?\.?(\d\d)$").expect("Hardcoded regex is valid.");
+        // PRO
+        let project_ex = Regex::new(r"^(\d\d\d)$").expect("Hardcoded regex is valid.");
+        // PRO.AC.ID or AC.ID
+        let jd_ex = Regex::new(r"^(\d\d\d)?\.?(\d\d)\.(\d\d)$").expect("Hardcoded regex is valid.");
+
+        let mut project: Option<u32> = None;
+        let mut category: Option<u32> = None;
+        let mut id: Option<u32> = None;
+
+        if input.is_some() {
+            match cat_ex.captures(&input.as_ref().unwrap()) {
+                Some(caps) => {
+                    project = caps.get(1).map(|v| v.as_str().parse().unwrap());
+                    category = caps.get(2).map(|v| v.as_str().parse().unwrap());
+                }
+                None => {}
+            }
+
+            match project_ex.captures(&input.as_ref().unwrap()) {
+                Some(caps) => {
+                    project = caps.get(1).map(|v| v.as_str().parse().unwrap());
+                }
+                None => {}
+            }
+
+            match jd_ex.captures(&input.unwrap()) {
+                Some(caps) => {
+                    project = caps.get(1).map(|v| v.as_str().parse().unwrap());
+                    category = caps.get(2).map(|v| v.as_str().parse().unwrap());
+                    id = caps.get(3).map(|v| v.as_str().parse().unwrap());
+                }
+                None => {}
+            }
+        }
+
+        let mut jd_list: Vec<&JdNumber>;
+
+        // if is a full decimal number, show it.
+        if id.is_some() && category.is_some() {
+            let to_find = JdNumber::new(
+                "",
+                "",
+                category.expect("Has already been checked to be some."),
+                id.expect("Has already been checked to be some."),
+                project,
+                None,
+                String::new(),
+                PathBuf::new(),
+            )
+            .expect("Manual jd number is valid");
+
+            match self.id.binary_search(&to_find) {
+                Ok(pos) => jd_list = vec![&self.id[pos]],
+                Err(_pos) => return Err("Cannot find JD number."),
+            };
+            // otherwise, if it is a category, show it.
+        } else if category.is_some() {
+            jd_list = Vec::new();
+            for item in &self.id {
+                if item.category == category.unwrap() && item.project == project {
+                    jd_list.push(&item);
+                }
+            }
+        } else if project.is_some() {
+            jd_list = Vec::new();
+            for item in &self.id {
+                if item.project == project {
+                    jd_list.push(&item);
+                }
+            }
+        } else {
+            jd_list = Vec::new();
+            for item in &self.id {
+                jd_list.push(&item);
+            }
+        }
+
+        // display the filtered numbers
+        let mut output = String::new();
+        let mut area_string = String::new();
+        let mut category_string = String::new();
+        let mut project_string: Option<String> = None;
+        for i in jd_list {
+            if i.project_label != project_string {
+                project_string = i.project_label.clone();
+                output.push_str(
+                    format!(
+                        "{}{}",
+                        i.project.unwrap(),
+                        &i.project_label.clone().unwrap_or(String::new())
+                    )
+                    .as_str(),
+                );
+                output.push_str("\n");
+            }
+            if i.area_label != area_string {
+                area_string = i.area_label.clone();
+                output.push_str(format!("  {}", &i.get_area().as_str()).as_str());
+                output.push_str("\n");
+            }
+            if i.category_label != category_string {
+                category_string = i.category_label.clone();
+                output.push_str(format!("    {}{}", i.category, &i.category_label).as_str());
+                output.push_str("\n");
+            }
+            output.push_str(format!("      {}", i.to_string()).as_str());
+            output.push_str("\n");
+        }
+
+        return Ok(output);
+    }
+
     // /// Search for a value, using fuzzy search.
     // pub fn search(&self, input: String) {
     //     //let list: Vec<String> = self.id.clone().into_iter().map(|s| s.to_string()).collect();
@@ -101,6 +230,8 @@ impl std::fmt::Display for System {
 
 #[cfg(test)]
 mod tests {
+    use colored::Colorize;
+
     use crate::{jdnumber::JdNumber, system::System};
     use std::path::PathBuf;
 
@@ -221,6 +352,69 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
         let system: System = ron::from_str(text).expect("Hardcoded value is valid.");
         return system;
     }
+    #[test]
+    fn test_show() {
+        let system = create_sample_system();
+
+        // test giving no argument
+        let mut left = system.display(None).unwrap();
+        let full_system = "  10-19_finance
+    12_payroll
+      12.01_sept_payroll
+      12.02_oct_payroll
+  20-29_admin
+    22_contracts
+      22.01_cleaning_contract
+      22.02_office_lease\n";
+
+        assert_eq!(left, full_system);
+
+        // test giving a category
+        let category = "  10-19_finance
+    12_payroll
+      12.01_sept_payroll
+      12.02_oct_payroll\n";
+        left = system.display(Some(String::from("12"))).unwrap();
+        assert_eq!(left, category);
+
+        // test giving a complete AC.ID number
+        let jd_number = "  20-29_admin
+    22_contracts
+      22.01_cleaning_contract\n";
+        left = system.display(Some(String::from("22.01"))).unwrap();
+        assert_eq!(left, jd_number);
+
+        // test giving giberish
+        left = system
+            .display(Some(String::from("this-is_some~giberish")))
+            .unwrap();
+        assert_eq!(left, full_system);
+
+        // test giving an empty string
+        left = system.display(Some(String::from(""))).unwrap();
+        assert_eq!(left, full_system);
+    }
+
+    #[test]
+    fn test_colorize() {
+        let string1 = "Hello world.".red();
+        let string2 = "Hello world.";
+
+        assert_ne!(string1.to_string().as_str(), string2);
+        assert_eq!(string1.clear().to_string().as_str(), string2);
+
+        let string3 = format!("{}:{}{}", "Red".red(), "Blue".blue(), "green".green());
+        let string4 = "Red:Bluegreen";
+
+        assert_ne!(string3.to_string().as_str(), string4);
+        assert_ne!(
+            Colorize::clear(string3.clone().as_str())
+                .to_string()
+                .as_str(),
+            string4
+        );
+    }
+
     #[test]
     fn test_search() {
         let system = create_sample_system();

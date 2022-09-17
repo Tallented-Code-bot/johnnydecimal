@@ -239,10 +239,10 @@ impl std::fmt::Display for JdNumber {
                 write!(
                     f,
                     "{:0>3}.{:0>2}.{:0>2}{}",
-                    project.to_string().red(),
-                    self.category.to_string().red(),
-                    self.id.to_string().red(),
-                    self.label.red()
+                    project.to_string(),       //.red(),
+                    self.category.to_string(), //.red(),
+                    self.id.to_string(),       //.red(),
+                    self.label,                //.red()
                 )
             }
 
@@ -250,9 +250,9 @@ impl std::fmt::Display for JdNumber {
                 write!(
                     f,
                     "{:0>2}.{:0>2}{}",
-                    self.category.to_string().red(),
-                    self.id.to_string().red(),
-                    self.label.red()
+                    self.category.to_string(), //.red(),
+                    self.id.to_string(),       //.red(),
+                    self.label,                //.red()
                 )
             }
         }
