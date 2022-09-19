@@ -49,6 +49,13 @@ enum Subcommand {
     Search {
         term: Option<String>,
     },
+    /// Add a Johnny Decimal number to the system
+    Add {
+        /// The category to add the number to
+        category: String,
+        /// The title of the number
+        title: String,
+    },
 }
 
 #[derive(Debug, Parser)]
@@ -126,6 +133,13 @@ fn main() -> Result<(), ()> {
             };
             println!("hi");
         }
+        Subcommand::Add { category, title } => {
+            let mut system = print_error(get_system())?;
+
+            print_error(system.add_id_from_str(category, title))?;
+
+            print_error(write_index(system))?;
+        }
     }
 
     Ok(())
@@ -172,7 +186,12 @@ fn index(mut filepath: path::PathBuf) {
     }
 
     filepath.push(".JdIndex");
-    fs::write(&filepath, ron::to_string(&system).unwrap()).expect("Could not write file");
+    fs::write(
+        &filepath,
+        ron::ser::to_string_pretty(&system, ron::ser::PrettyConfig::new()).unwrap(),
+    )
+    .expect("Could not write file");
+
     println!("Index has been written to {}", filepath.display());
 }
 
@@ -270,6 +289,31 @@ fn find_index() -> Option<String> {
         if !(path.pop() && path.pop()) {
             break None;
         }
+    }
+}
+
+fn write_index(system: System) -> Result<(), &'static str> {
+    let mut path = env::current_dir().unwrap();
+    let file = path::Path::new(".JdIndex");
+
+    loop {
+        path.push(file);
+
+        if path.is_file() {
+            break;
+        }
+
+        if !(path.pop() && path.pop()) {
+            return Err("Could not find index file to write to.");
+        }
+    }
+
+    match fs::write(
+        path,
+        ron::ser::to_string_pretty(&system, ron::ser::PrettyConfig::new()).unwrap(),
+    ) {
+        Ok(_result) => Ok(()),
+        Err(_err) => Err("Cannot write to file."),
     }
 }
 

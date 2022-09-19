@@ -63,6 +63,54 @@ impl System {
         };
     }
 
+    /// Parse a Jd input.
+    ///
+    /// The input should be a Johnny Decimal number, or a partial Johnny Decimal number.
+    /// The types of numbers can be:
+    /// - PRO.AC.ID or AC.ID
+    /// - PRO
+    /// - AC/PRO.AC
+    ///
+    /// It returns a tuple of the project, category, and id.
+    fn parse_jd_input(input: String) -> (Option<u32>, Option<u32>, Option<u32>) {
+        // PRO.AC or AC
+        let cat_ex = Regex::new(r"^(\d\d\d)?\.?(\d\d)$").expect("Hardcoded regex is valid.");
+        // PRO
+        let project_ex = Regex::new(r"^(\d\d\d)$").expect("Hardcoded regex is valid.");
+        // PRO.AC.ID or AC.ID
+        let jd_ex = Regex::new(r"^(\d\d\d)?\.?(\d\d)\.(\d\d)$").expect("Hardcoded regex is valid.");
+
+        let mut project: Option<u32> = None;
+        let mut category: Option<u32> = None;
+        let mut id: Option<u32> = None;
+
+        match cat_ex.captures(&input) {
+            Some(caps) => {
+                project = caps.get(1).map(|v| v.as_str().parse().unwrap());
+                category = caps.get(2).map(|v| v.as_str().parse().unwrap());
+            }
+            None => {}
+        };
+
+        match project_ex.captures(&input) {
+            Some(caps) => {
+                project = caps.get(1).map(|v| v.as_str().parse().unwrap());
+            }
+            None => {}
+        };
+
+        match jd_ex.captures(&input) {
+            Some(caps) => {
+                project = caps.get(1).map(|v| v.as_str().parse().unwrap());
+                category = caps.get(2).map(|v| v.as_str().parse().unwrap());
+                id = caps.get(3).map(|v| v.as_str().parse().unwrap());
+            }
+            None => {}
+        };
+
+        return (project, category, id);
+    }
+
     /// Display a johnny decimal system.
     ///
     /// The input should be a Johnny Decimal number, or a partial Johnny Decimal number.
@@ -78,42 +126,11 @@ impl System {
     /// If `None`, an empty string, or a string with some other giberish
     /// is input, the whole Johnny Decimal system will be displayed.
     pub fn display(&self, input: Option<String>) -> Result<String, &str> {
-        // PRO.AC or AC
-        let cat_ex = Regex::new(r"^(\d\d\d)?\.?(\d\d)$").expect("Hardcoded regex is valid.");
-        // PRO
-        let project_ex = Regex::new(r"^(\d\d\d)$").expect("Hardcoded regex is valid.");
-        // PRO.AC.ID or AC.ID
-        let jd_ex = Regex::new(r"^(\d\d\d)?\.?(\d\d)\.(\d\d)$").expect("Hardcoded regex is valid.");
+        // let mut project: Option<u32> = None;
+        // let mut category: Option<u32> = None;
+        // let mut id: Option<u32> = None;
 
-        let mut project: Option<u32> = None;
-        let mut category: Option<u32> = None;
-        let mut id: Option<u32> = None;
-
-        if input.is_some() {
-            match cat_ex.captures(&input.as_ref().unwrap()) {
-                Some(caps) => {
-                    project = caps.get(1).map(|v| v.as_str().parse().unwrap());
-                    category = caps.get(2).map(|v| v.as_str().parse().unwrap());
-                }
-                None => {}
-            }
-
-            match project_ex.captures(&input.as_ref().unwrap()) {
-                Some(caps) => {
-                    project = caps.get(1).map(|v| v.as_str().parse().unwrap());
-                }
-                None => {}
-            }
-
-            match jd_ex.captures(&input.unwrap()) {
-                Some(caps) => {
-                    project = caps.get(1).map(|v| v.as_str().parse().unwrap());
-                    category = caps.get(2).map(|v| v.as_str().parse().unwrap());
-                    id = caps.get(3).map(|v| v.as_str().parse().unwrap());
-                }
-                None => {}
-            }
-        }
+        let (project, category, id) = System::parse_jd_input(input.unwrap_or("".to_string()));
 
         let mut jd_list: Vec<&JdNumber>;
 
@@ -190,6 +207,70 @@ impl System {
         }
 
         return Ok(output);
+    }
+
+    fn filter_id(
+        &self,
+        project: Option<u32>,
+        category: Option<u32>,
+        id: Option<u32>,
+    ) -> Vec<&JdNumber> {
+        let mut to_return: Vec<&JdNumber> = Vec::new();
+        for i in &self.id {
+            if i.project != project {
+                continue;
+            }
+            if category.is_some() {
+                if category.unwrap() != i.category {
+                    continue;
+                }
+            }
+            if id.is_some() {
+                if id.unwrap() != i.id {
+                    continue;
+                }
+            }
+            to_return.push(&i);
+        }
+        return to_return;
+    }
+
+    /// Add an id from a string.
+    ///
+    /// The string can be a PRO.AC number
+    /// or an AC number.
+    pub fn add_id_from_str(&mut self, jd: String, title: String) -> Result<(), &str> {
+        let (project, category, _) = System::parse_jd_input(jd);
+
+        if category.is_none() {
+            return Err("Could not find category.");
+        }
+
+        let mut numbers = self.filter_id(project, category, None);
+        numbers.sort();
+
+        // now the last number should be highest.
+        let number = numbers[numbers.len() - 1];
+
+        let mut jd = match JdNumber::new(
+            &number.area_label,
+            &number.category_label,
+            number.category,
+            number.id + 1,
+            number.project,
+            number.project_label.clone(),
+            title,
+            PathBuf::new(),
+        ) {
+            Ok(x) => x,
+            Err(_) => return Err("Could not create JD number."),
+        };
+
+        jd.path = crate::jdnumber::Location::Path(self.path.join(jd.get_relative_path()));
+
+        self.add_id(jd)?;
+
+        return Ok(());
     }
 
     /// Get an id from the system.
@@ -478,5 +559,62 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
             JdNumber::new("", "", 50, 32, None, None, "l".to_string(), PathBuf::new()).unwrap();
 
         assert!(system.get_id(jd3).is_err());
+    }
+
+    #[test]
+    fn test_add_id_from_str() {
+        let mut system = create_sample_system();
+        system
+            .add_id_from_str("12".to_string(), "_a_title".to_string())
+            .unwrap();
+
+        assert_eq!(
+            system.id[2], //because it is sorted, it is the third element.
+            JdNumber::new(
+                "_finance",
+                "_payroll",
+                12,
+                03,
+                None,
+                None,
+                "_a_title".to_string(),
+                PathBuf::from("jd/10-19_finance/12_payroll/12.03_a_title")
+            )
+            .expect("Manual JD to be valid")
+        );
+
+        assert!(system
+            .add_id_from_str("glasdf".to_string(), "s".to_string())
+            .is_err());
+
+        system
+            .add_id_from_str("12".to_string(), "_a_title".to_string())
+            .unwrap();
+
+        assert_eq!(
+            system.id[3],
+            JdNumber::new(
+                "_finance",
+                "_payroll",
+                12,
+                04,
+                None,
+                None,
+                "_a_title".to_string(),
+                PathBuf::from("jd/10-19_finance/12_payroll/12.03_a_title")
+            )
+            .expect("Manual JD to be valid")
+        );
+
+        // make there be 99 ids in the category.
+        for i in 0..95 {
+            system
+                .add_id_from_str("12".to_string(), format!("_jd_number_{}", i))
+                .unwrap();
+        }
+
+        assert!(system
+            .add_id_from_str("12".to_string(), "_should_fail".to_string())
+            .is_err());
     }
 }
