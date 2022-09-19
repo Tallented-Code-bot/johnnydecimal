@@ -79,3 +79,11 @@ your files and write the index to `<ROOT_FOLDER>/.JdIndex`.
 3. As long as you are inside your root folder, you can use `jd`. You could show all your JD numbers with
 `jd show`, you could add a new one with `jd add <CATEGORY>`, or you could go to a specific one with
 `j <JD_NUMBER>`(assuming that you added the config to your shell!).
+
+
+## Contributing and License
+This project is under the GNU GPL-3 license.  (You can view the license [here](LICENSE).)
+
+Feel free to contribute to this project, either by submitting a pull request
+or by adding an issue.
+
