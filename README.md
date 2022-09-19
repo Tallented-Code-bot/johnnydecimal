@@ -65,3 +65,17 @@ Add this to your configuration, usually found at `~/.zshrc`.
 eval "$(jd init zsh)"
 ```
 </details>
+
+## Getting started
+
+The first thing you need to do is index your Johnny Decimal system.
+
+1. Go to the folder above your Johnny Decimal root folder. For example, if your root folder is `~/jd`,
+you would go to `~`. 
+
+2. Run `jd index <ROOT_FOLDER>`. For this example, you would run `jd index jd/`. This will look at all
+your files and write the index to `<ROOT_FOLDER>/.JdIndex`.
+
+3. As long as you are inside your root folder, you can use `jd`. You could show all your JD numbers with
+`jd show`, you could add a new one with `jd add <CATEGORY>`, or you could go to a specific one with
+`j <JD_NUMBER>`(assuming that you added the config to your shell!).
