@@ -26,6 +26,7 @@ enum Subcommand {
         path: path::PathBuf,
     },
     /// Show part or all of a Johnny Decimal system
+    #[clap(visible_alias("display"))]
     Show {
         /// The thing to show.
         ///
@@ -38,17 +39,18 @@ enum Subcommand {
         /// the whole Johnny Decimal system is shown.
         item: Option<String>,
     },
-    Display,
-    Cd {
-        term: String,
+    /// Get the path for a Johnny Decimal number
+    Path {
+        /// The Johnny Decimal number.
+        item: String,
     },
+    /// List all Johnny Decimal numbers, one each line.
+    #[clap(visible_alias("ls"))]
     List,
-    Init {
-        shell: InitShell,
-    },
-    Search {
-        term: Option<String>,
-    },
+    /// [Shell config only] Install shell bindings.
+    Init { shell: InitShell },
+    /// (Not working) Search for a a Johnny Decimal number
+    Search { term: Option<String> },
     /// Add a Johnny Decimal number to the system
     Add {
         /// The category to add the number to
@@ -90,16 +92,6 @@ impl std::str::FromStr for InitShell {
 
 fn main() -> Result<(), ()> {
     let cli = Cli::parse();
-    // let system;
-    // match get_system() {
-    //     Ok(sys) => system = sys,
-    //     Err(message) => {
-    //         println!("{} {}", "Error:".magenta(), message);
-    //         return;
-    //     }
-    // };
-
-    //return print_error(system.search("hi"));
 
     match cli.subcommand {
         Subcommand::Index { path } => {
@@ -110,11 +102,7 @@ fn main() -> Result<(), ()> {
             let output = print_error(system.display(term))?;
             println!("{}", output);
         }
-        Subcommand::Display => {
-            let system = print_error(get_system())?;
-            println!("{}", system);
-        }
-        Subcommand::Cd { term } => match go_to_jd(term) {
+        Subcommand::Path { item: term } => match go_to_jd(term) {
             Ok(_) => {}
             Err(message) => println!("{} {}", "Error:".magenta(), message),
         },
@@ -131,7 +119,7 @@ fn main() -> Result<(), ()> {
                 Some(_x) => {}
                 None => {}
             };
-            println!("hi");
+            println!("{}: Search does not work yet.", "Error".red());
         }
         Subcommand::Add { category, title } => {
             let mut system = print_error(get_system())?;
@@ -202,18 +190,18 @@ fn init(shell: InitShell) {
     let text = match shell {
         InitShell::Fish => "
 function j
-    pushd $(jd cd $argv)
+    pushd $(jd path $argv)
 end"
         .to_string(),
         InitShell::Bash => r#"
 function j(){
-    cd $(jd cd "$@")
+    cd $(jd path "$@")
 }
 "#
         .to_string(),
         InitShell::Zsh => r#"
 function j(){
-    cd $(jd cd "$@")
+    cd $(jd path "$@")
 }
 
 "#

@@ -4,17 +4,20 @@ use serde::{Deserialize, Serialize};
 use std::path;
 use std::path::PathBuf;
 
+/// A Johnny Decimal system.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct System {
     /// The root path of the Johnny Decimal system.
     pub path: path::PathBuf,
-    pub projects: Vec<String>,
     /// A list of Johnny Decimal numbers.
     pub id: Vec<JdNumber>,
 }
 
 impl System {
-    /// Add an id to the system
+    /// Add an id to the system.
+    ///
+    /// This adds an id to the system only if it is not a
+    /// duplicate; otherwise, it returns `Err()`.
     pub fn add_id(&mut self, id: JdNumber) -> Result<(), &str> {
         match self.id.binary_search(&id) {
             Ok(_pos) => return Err("Element already exists."),
@@ -23,45 +26,49 @@ impl System {
         return Ok(());
     }
 
+    /// Create a new System.
     pub fn new(path: path::PathBuf) -> Self {
         System {
             path,
-            projects: Vec::new(),
             id: Vec::new(),
         }
     }
-    pub fn show(&self, search: &str) -> Result<JdNumber, &str> {
-        let re = Regex::new(r"(\d{3})?\.?(\d{2})\.(\d{2})").unwrap();
 
-        let captures = match re.captures(search) {
-            Some(x) => x,
-            None => return Err("Invalid search term.  Search term should be a valid JD number."),
-        };
+    //DEPRECATED
+    // Keep this for awhile, then delete it.
 
-        let category: u32 = captures.get(2).unwrap().as_str().parse().unwrap();
-        let id: u32 = captures.get(3).unwrap().as_str().parse().unwrap();
-        let project = match captures.get(1) {
-            Some(x) => Some(x.as_str().parse::<u32>().unwrap()),
-            None => None,
-        };
+    // fn show(&self, search: &str) -> Result<JdNumber, &str> {
+    //     let re = Regex::new(r"(\d{3})?\.?(\d{2})\.(\d{2})").unwrap();
 
-        let to_find = JdNumber::new(
-            "cat",
-            "area",
-            category,
-            id,
-            project,
-            Some("project_label".to_string()),
-            "label".to_string(),
-            PathBuf::new(),
-        )
-        .unwrap();
+    //     let captures = match re.captures(search) {
+    //         Some(x) => x,
+    //         None => return Err("Invalid search term.  Search term should be a valid JD number."),
+    //     };
 
-        return match self.id.binary_search(&to_find) {
-            Ok(index) => Ok(self.id[index].clone()),
-            Err(_) => Err("Cannot find number."),
-        };
-    }
+    //     let category: u32 = captures.get(2).unwrap().as_str().parse().unwrap();
+    //     let id: u32 = captures.get(3).unwrap().as_str().parse().unwrap();
+    //     let project = match captures.get(1) {
+    //         Some(x) => Some(x.as_str().parse::<u32>().unwrap()),
+    //         None => None,
+    //     };
+
+    //     let to_find = JdNumber::new(
+    //         "cat",
+    //         "area",
+    //         category,
+    //         id,
+    //         project,
+    //         Some("project_label".to_string()),
+    //         "label".to_string(),
+    //         PathBuf::new(),
+    //     )
+    //     .unwrap();
+
+    //     return match self.id.binary_search(&to_find) {
+    //         Ok(index) => Ok(self.id[index].clone()),
+    //         Err(_) => Err("Cannot find number."),
+    //     };
+    // }
 
     /// Parse a Jd input.
     ///
@@ -209,6 +216,11 @@ impl System {
         return Ok(output);
     }
 
+    /// Filter by PRO, AC, and/or ID.
+    ///
+    /// Given PRO, AC, and ID arguments, this returns
+    /// all the JD numbers that match.  If a parameter is none
+    /// it is not filtered by.
     fn filter_id(
         &self,
         project: Option<u32>,
@@ -279,6 +291,11 @@ impl System {
             Ok(index) => Ok(self.id[index].clone()),
             Err(_) => Err("Could not find JD"),
         }
+    }
+
+    /// Parse a list of paths
+    pub fn from_string(_strings: Vec<String>) {
+        todo!();
     }
 
     // /// Search for a value, using fuzzy search.
@@ -504,35 +521,36 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
         );
     }
 
-    #[test]
-    fn test_search() {
-        let system = create_sample_system();
-        let result1 = JdNumber::new(
-            "_finance",
-            "_payroll",
-            12,
-            1,
-            None,
-            None,
-            "_sept_payroll".to_string(),
-            PathBuf::new(),
-        )
-        .unwrap();
+    // DEPRECATED
 
-        assert_eq!(system.show("12.01").unwrap(), result1);
-        assert!(system.show("this_is_gibberish").is_err());
-        assert_eq!(
-            system.show("12.1").err().unwrap(),
-            "Invalid search term.  Search term should be a valid JD number."
-        );
+    //#[test]
+    // fn _test_search() {
+    //     let system = create_sample_system();
+    //     let result1 = JdNumber::new(
+    //         "_finance",
+    //         "_payroll",
+    //         12,
+    //         1,
+    //         None,
+    //         None,
+    //         "_sept_payroll".to_string(),
+    //         PathBuf::new(),
+    //     )
+    //     .unwrap();
 
-        assert_eq!(system.show("50.02").err().unwrap(), "Cannot find number.");
-        assert_eq!(
-            system.show("").err().unwrap(),
-            "Invalid search term.  Search term should be a valid JD number."
-        );
-    }
+    //     assert_eq!(system.show("12.01").unwrap(), result1);
+    //     assert!(system.show("this_is_gibberish").is_err());
+    //     assert_eq!(
+    //         system.show("12.1").err().unwrap(),
+    //         "Invalid search term.  Search term should be a valid JD number."
+    //     );
 
+    //     assert_eq!(system.show("50.02").err().unwrap(), "Cannot find number.");
+    //     assert_eq!(
+    //         system.show("").err().unwrap(),
+    //         "Invalid search term.  Search term should be a valid JD number."
+    //     );
+    // }
     #[test]
     fn test_get_id() {
         let system = create_sample_system();

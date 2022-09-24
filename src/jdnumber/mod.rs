@@ -1,4 +1,3 @@
-use colored::Colorize;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -15,18 +14,29 @@ pub enum Location {
 /// A Johnny.Decimal number.
 ///
 /// Can be either `PRO.AC.ID` or `AC.ID`.
+/// In path form a Johnny Decimal number looks something like this:
+/// `20-29_area_label/25_category_label/25.21_jd_label`
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JdNumber {
+    /// The project number, if it exists
     pub project: Option<u32>,
+    /// The project label, for example 101**_project_1**
     pub project_label: Option<String>,
+    /// The category, between 0 and 99.
     pub category: u32,
+    /// The id, between 0 and 99.
     pub id: u32,
+    /// The label, for example 50.42**_this_is_the_label**.
     pub label: String,
+    /// The area label:
     pub area_label: String,
+    /// The category label
     pub category_label: String,
+    /// The path of the JD number relative to the system root.
     pub path: Location,
 }
 impl JdNumber {
+    /// Create a new JD number, with some error checking.
     pub fn new(
         area_label: &str,
         category_label: &str,
@@ -64,6 +74,10 @@ impl JdNumber {
         });
     }
 
+    /// Get the area+label of a JD number.
+    ///
+    /// This returns a string in the format
+    /// `50-59_area_label`
     pub fn get_area(&self) -> String {
         format!(
             "{area}0-{area}9{}",
@@ -72,6 +86,7 @@ impl JdNumber {
         )
     }
 
+    /// Get the relative path of a JD number.
     pub fn get_relative_path(&self) -> PathBuf {
         // format!(
         //     "{}/{:0>2}{}/{:0>2}.{:0>2}{}",
