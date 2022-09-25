@@ -34,6 +34,23 @@ mv ./target/release/jd ~/.local/bin/
 ```
 </details>
 
+<details>
+<summary>From binary</summary>
+
+1. Download the zip or tar file for your OS from the
+[release page](https://github.com/Tallented-Code-bot/johnnydecimal/releases).
+
+2. If you are on windows, extract the zip file. If you are on mac/linux, you can extract the tar.gz file
+like this.
+
+``` sh
+tar -xvf <tar.gz file>
+```
+
+3. Move the `jd` or `jd.exe` executable to somewhere on your path.
+On linux a good place could be `~/.local/bin/`.
+</details>
+
 
 ### Step 2: Add Johnnydecimal to your shell
 This enables you to easily `cd` to any johnnydecimal number.
