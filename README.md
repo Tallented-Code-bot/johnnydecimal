@@ -67,6 +67,7 @@ jd init fish | source
 </details>
 <details>
 <summary>Bash</summary>
+  
 Add this to your configuration, usually found at `~/.bashrc`.
 
 ``` sh
@@ -76,6 +77,7 @@ eval "$(jd init bash)"
 
 <details>
 <summary>Zsh</summary>
+  
 Add this to your configuration, usually found at `~/.zshrc`.
 
 ``` sh
