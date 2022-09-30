@@ -358,6 +358,26 @@ impl System {
         separated_pair(System::match_project, char('-'), System::match_project)(input)
     }
 
+    /// Match a project area line:
+    /// `500-599 Project area`
+    fn project_area_line(i: &str) -> IResult<&str, ((u32, u32), &str, ())> {
+        tuple((
+            System::match_project_range,
+            not_line_ending,
+            System::consume_newline,
+        ))(i)
+    }
+
+    /// Match a project line;
+    /// `501 project`
+    fn project_line(i: &str) -> IResult<&str, (u32, &str, ())> {
+        tuple((
+            System::match_project,
+            not_line_ending,
+            System::consume_newline,
+        ))(i)
+    }
+
     fn match_area_range(input: &str) -> IResult<&str, (u32, u32)> {
         separated_pair(System::match_area, char('-'), System::match_area)(input)
     }
@@ -852,6 +872,40 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
         assert_eq!(
             System::category_line("50_hi\n50.01 jd label"),
             Ok(("50.01 jd label", (50, "_hi", ())))
+        );
+    }
+
+    #[test]
+    fn test_project_area_line() {
+        assert_eq!(
+            System::project_area_line("100-199_Project_1"),
+            Ok(("", ((100, 199), "_Project_1", ())))
+        );
+
+        assert_eq!(
+            System::project_area_line("500-599 another project\n50-59 area"),
+            Ok(("50-59 area", ((500, 599), " another project", ())))
+        );
+
+        assert!(System::project_area_line("this is some gibberish").is_err());
+        assert!(System::project_area_line("50-59 area").is_err());
+    }
+
+    #[test]
+    fn test_project_line() {
+        assert_eq!(
+            System::project_line("105 Project"),
+            Ok(("", (105, " Project", ())))
+        );
+
+        assert_eq!(
+            System::project_line("502_project2"),
+            Ok(("", (502, "_project2", ())))
+        );
+
+        assert_eq!(
+            System::project_line("107 project\n50-59 area"),
+            Ok(("50-59 area", (107, " project", ())))
         );
     }
 
