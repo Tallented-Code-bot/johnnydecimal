@@ -1,11 +1,18 @@
 use crate::jdnumber::JdNumber;
+use nom::{
+    character::complete::{char, line_ending, newline, not_line_ending, one_of},
+    combinator::{not, opt, recognize, value},
+    multi::{count, many0, many1},
+    sequence::{pair, separated_pair, terminated, tuple},
+    IResult,
+};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path;
 use std::path::PathBuf;
 
 /// A Johnny Decimal system.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct System {
     /// The root path of the Johnny Decimal system.
     pub path: path::PathBuf,
@@ -308,6 +315,155 @@ impl System {
     //         list.push(id.to_string().as_str());
     //     }
     // }
+
+    /// Match a PRO project number.
+    fn match_project(input: &str) -> IResult<&str, u32> {
+        // count(is_digit(take(1)), 3);
+        recognize(count(terminated(one_of("0123456789"), many0(char('<'))), 3))(input)
+            .map(|(next_input, res)| (next_input, res.parse().unwrap()))
+    }
+
+    /// Match an AC area number.
+    /// ```
+    /// assert_eq!(match_area("53"),Ok(("","53")));
+    /// ```
+    fn match_area(input: &str) -> IResult<&str, u32> {
+        recognize(count(terminated(one_of("0123456789"), many0(char('<'))), 2))(input).map(
+            |(n_i, res)| {
+                println!("{}", res);
+                (n_i, res.parse().expect("Parser forces numbers"))
+            },
+        )
+    }
+
+    /// Match an ID number.
+    /// ```
+    /// assert_eq!(match_id("43"),Ok(("","43")));
+    /// ```
+    fn match_id(input: &str) -> IResult<&str, u32> {
+        recognize(count(terminated(one_of("0123456789"), many0(char('<'))), 2))(input)
+            .map(|(n_i, res)| (n_i, res.parse().unwrap()))
+    }
+
+    /// Match a PRO-PRO range.
+    ///
+    /// For example,
+    ///
+    /// ```
+    /// assert_eq!(
+    ///     match_project_range("500-599"),
+    ///     Ok(("",("599","500"))));
+    /// ```
+    fn match_project_range(input: &str) -> IResult<&str, (u32, u32)> {
+        separated_pair(System::match_project, char('-'), System::match_project)(input)
+    }
+
+    fn match_area_range(input: &str) -> IResult<&str, (u32, u32)> {
+        separated_pair(System::match_area, char('-'), System::match_area)(input)
+    }
+
+    /// Parse an area line
+    /// `10-19 This is the area name`
+    fn area_line(input: &str) -> IResult<&str, ((u32, u32), &str, ())> {
+        tuple((
+            System::match_area_range,
+            not_line_ending,
+            System::consume_newline,
+        ))(input)
+    }
+
+    /// Parse a Jd line
+    /// `50.42 label`
+    fn jd_line(
+        input: &str,
+    ) -> IResult<&str, (Option<u32>, Option<char>, u32, char, u32, &str, ())> {
+        tuple((
+            opt(System::match_project),
+            opt(char('.')),
+            System::match_area,
+            char('.'),
+            System::match_id,
+            not_line_ending,
+            System::consume_newline,
+        ))(input)
+    }
+
+    fn consume_newline(i: &str) -> IResult<&str, ()> {
+        value((), opt(line_ending))(i)
+    }
+
+    fn category_line(input: &str) -> IResult<&str, (u32, &str, ())> {
+        let (unmatched, ((), area, label, ())) = match tuple((
+            not(System::match_area_range),
+            System::match_area,
+            not_line_ending,
+            System::consume_newline,
+        ))(input)
+        {
+            Ok(x) => x,
+            Err(e) => return Err(e),
+        };
+
+        return Ok((unmatched, (area, label, ())));
+    }
+
+    /// Parse a system
+    pub fn parse(input: &str) -> Result<System, &str> {
+        let (unparsed, areas) = match many0(tuple((
+            System::area_line,
+            many0(pair(System::category_line, many0(System::jd_line))),
+        )))(input)
+        {
+            Ok(m) => m,
+            Err(_e) => {
+                return Err("Error parsing");
+            }
+        };
+
+        let mut system = System::new(PathBuf::new());
+
+        println!("unparsed: {}", unparsed);
+
+        // iterate through the areas
+        for (((first, last), area_label, _), categories) in areas {
+            println!("area:{}-{}", first, last);
+            if first % 10 != 0 {
+                return Err("Not a multiple of 10");
+            }
+            if first + 9 != last {
+                return Err("Not a difference of 9");
+            }
+            for ((number, category_label, _), ids) in categories {
+                println!("category:{}", number);
+                if !(first <= number && number <= last) {
+                    return Err("Category not between area limits");
+                }
+
+                for (project, _, ac, _, id, label, _) in ids {
+                    println!("id");
+                    let jd = match JdNumber::new(
+                        area_label,
+                        category_label,
+                        ac,
+                        id,
+                        project,
+                        None,
+                        label.to_string(),
+                        PathBuf::new(),
+                    ) {
+                        Ok(j) => j,
+                        Err(_) => return Err("Could not create a jd number"),
+                    };
+                    match system.add_id(jd) {
+                        Ok(_) => {}
+                        Err(_) => return Err("Could not add jd number"),
+                    };
+                }
+            }
+        }
+
+        return Ok(system);
+    }
 }
 
 impl std::fmt::Display for System {
@@ -634,5 +790,122 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
         assert!(system
             .add_id_from_str("12".to_string(), "_should_fail".to_string())
             .is_err());
+    }
+    #[test]
+    fn test_match_projects() {
+        assert_eq!(System::match_project("502"), Ok(("", 502)));
+        // assert_eq!(System::match_project("552432"), Ok(("", "552432")));
+        assert_eq!(System::match_project("552432"), Ok(("432", 552)));
+        assert!(System::match_project("project").is_err());
+
+        assert_eq!(
+            System::match_project("500-599_project_name"),
+            Ok(("-599_project_name", 500))
+        );
+    }
+
+    #[test]
+    fn test_area_line() {
+        assert_eq!(
+            System::area_line("50-59_area_name\n"),
+            Ok(("", ((50, 59), "_area_name", ())))
+        );
+
+        assert_eq!(
+            System::area_line("10-19 area name2\n"),
+            Ok(("", ((10, 19), " area name2", ())))
+        );
+
+        assert_eq!(
+            System::area_line("10-19 Area\n\t11 Category"),
+            Ok(("\t11 Category", ((10, 19), " Area", ())))
+        );
+    }
+
+    #[test]
+    fn test_jd_line() {
+        assert_eq!(
+            System::jd_line("50.42 Test label"),
+            Ok(("", (None, None, 50, '.', 42, " Test label", ())))
+        );
+
+        assert_eq!(
+            System::jd_line("104.10.53_testing"),
+            Ok(("", (Some(104), Some('.'), 10, '.', 53, "_testing", ())))
+        );
+
+        assert_eq!(
+            System::jd_line("10.99_hi\nThis is extra."),
+            Ok(("This is extra.", (None, None, 10, '.', 99, "_hi", ())))
+        );
+    }
+
+    #[test]
+    fn test_category_line() {
+        assert_eq!(
+            System::category_line("12 Category"),
+            Ok(("", (12, " Category", ())))
+        );
+
+        assert!(System::category_line("some_giberish").is_err());
+
+        assert_eq!(
+            System::category_line("50_hi\n50.01 jd label"),
+            Ok(("50.01 jd label", (50, "_hi", ())))
+        );
+    }
+
+    #[test]
+    fn test_parse() {
+        assert_eq!(
+            System::parse(
+                "10-19_finance
+12_payroll
+12.01_oct_payroll
+20-29_admin
+22_contracts
+22.01_cleaning_contract
+22.02_office_lease"
+            )
+            .unwrap(),
+            System {
+                path: PathBuf::new(),
+                id: vec![
+                    JdNumber::new(
+                        "_finance",
+                        "_payroll",
+                        12,
+                        01,
+                        None,
+                        None,
+                        "_oct_payroll".to_string(),
+                        PathBuf::new()
+                    )
+                    .unwrap(),
+                    JdNumber::new(
+                        "_admin",
+                        "_contracts",
+                        22,
+                        01,
+                        None,
+                        None,
+                        "_cleaning_contract".to_string(),
+                        PathBuf::new()
+                    )
+                    .unwrap(),
+                    JdNumber::new(
+                        "_admin",
+                        "_contracts",
+                        22,
+                        02,
+                        None,
+                        None,
+                        "_office_lease".to_string(),
+                        PathBuf::new()
+                    )
+                    .unwrap()
+                ],
+            }
+        );
     }
 }
