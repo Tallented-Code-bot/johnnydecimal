@@ -1,6 +1,6 @@
 use crate::jdnumber::JdNumber;
 use nom::{
-    character::complete::{char, line_ending, newline, not_line_ending, one_of},
+    character::complete::{char, line_ending, not_line_ending, one_of},
     combinator::{not, opt, recognize, value},
     multi::{count, many0, many1},
     sequence::{pair, separated_pair, terminated, tuple},
@@ -328,12 +328,8 @@ impl System {
     /// assert_eq!(match_area("53"),Ok(("","53")));
     /// ```
     fn match_area(input: &str) -> IResult<&str, u32> {
-        recognize(count(terminated(one_of("0123456789"), many0(char('<'))), 2))(input).map(
-            |(n_i, res)| {
-                println!("{}", res);
-                (n_i, res.parse().expect("Parser forces numbers"))
-            },
-        )
+        recognize(count(terminated(one_of("0123456789"), many0(char('<'))), 2))(input)
+            .map(|(n_i, res)| (n_i, res.parse().expect("Parser forces numbers")))
     }
 
     /// Match an ID number.
@@ -427,9 +423,29 @@ impl System {
         return Ok((unmatched, (area, label, ())));
     }
 
-    /// Parse a system
     pub fn parse(input: &str) -> Result<System, &str> {
-        let (unparsed, areas) = match many0(tuple((
+        let with_projects = System::parse_with_projects(input);
+        let without_projects = System::parse_without_projects(input);
+
+        let system: System;
+
+        // if the system uses projects:
+        if with_projects.is_ok() && without_projects.is_err() {
+            system = with_projects.expect("If statement makes it be OK");
+        } else if with_projects.is_err() && without_projects.is_ok() {
+            system = without_projects.expect("If statement makes it be OK");
+        } else if with_projects.is_err() && without_projects.is_err() {
+            return Err("Could not parse system.");
+        } else {
+            panic!("Both functions should not return Ok");
+        }
+
+        return Ok(system);
+    }
+
+    /// Parse a system
+    fn parse_without_projects(input: &str) -> Result<System, &str> {
+        let (_unparsed, areas) = match many1(tuple((
             System::area_line,
             many0(pair(System::category_line, many0(System::jd_line))),
         )))(input)
@@ -442,11 +458,8 @@ impl System {
 
         let mut system = System::new(PathBuf::new());
 
-        println!("unparsed: {}", unparsed);
-
         // iterate through the areas
         for (((first, last), area_label, _), categories) in areas {
-            println!("area:{}-{}", first, last);
             if first % 10 != 0 {
                 return Err("Not a multiple of 10");
             }
@@ -454,13 +467,11 @@ impl System {
                 return Err("Not a difference of 9");
             }
             for ((number, category_label, _), ids) in categories {
-                println!("category:{}", number);
                 if !(first <= number && number <= last) {
                     return Err("Category not between area limits");
                 }
 
                 for (project, _, ac, _, id, label, _) in ids {
-                    println!("id");
                     let jd = match JdNumber::new(
                         area_label,
                         category_label,
@@ -478,6 +489,85 @@ impl System {
                         Ok(_) => {}
                         Err(_) => return Err("Could not add jd number"),
                     };
+                }
+            }
+        }
+
+        return Ok(system);
+    }
+
+    /// Parse a system with project notation
+    fn parse_with_projects(input: &str) -> Result<System, &str> {
+        let (_unparsed, project_areas) = match many1(pair(
+            System::project_area_line,
+            many0(pair(
+                System::project_line,
+                many0(pair(
+                    System::area_line,
+                    many0(pair(System::category_line, many0(System::jd_line))),
+                )),
+            )),
+        ))(input)
+        {
+            Ok(m) => m,
+            Err(_e) => {
+                return Err("Error parsing");
+            }
+        };
+
+        let mut system = System::new(PathBuf::new());
+
+        // iterate through the areas
+
+        for (((project_first, project_last), _project_area_label, _), projects) in project_areas {
+            for ((project, project_label, _), areas) in projects {
+                if !(project_first <= project && project <= project_last) {
+                    return Err("Project not between project ranges");
+                }
+
+                if project_first % 100 != 0 {
+                    return Err("First project number not a multiple of 100");
+                }
+
+                if project_first + 99 != project_last {
+                    return Err("Second project number not 99 greater than first");
+                }
+                for (((first, last), area_label, _), categories) in areas {
+                    if first % 10 != 0 {
+                        return Err("Not a multiple of 10");
+                    }
+                    if first + 9 != last {
+                        return Err("Not a difference of 9");
+                    }
+                    for ((number, category_label, _), ids) in categories {
+                        if !(first <= number && number <= last) {
+                            return Err("Category not between area limits");
+                        }
+
+                        for (jd_project, _, ac, _, id, label, _) in ids {
+                            if jd_project != Some(project) {
+                                return Err("Project numbers do not match");
+                            }
+
+                            let jd = match JdNumber::new(
+                                area_label,
+                                category_label,
+                                ac,
+                                id,
+                                jd_project,
+                                Some(project_label.to_string()),
+                                label.to_string(),
+                                PathBuf::new(),
+                            ) {
+                                Ok(j) => j,
+                                Err(_) => return Err("Could not create a jd number"),
+                            };
+                            match system.add_id(jd) {
+                                Ok(_) => {}
+                                Err(_) => return Err("Could not add jd number"),
+                            };
+                        }
+                    }
                 }
             }
         }
@@ -913,6 +1003,59 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
     fn test_parse() {
         assert_eq!(
             System::parse(
+                "100-199_project_area_name
+101_project_name
+10-19_finance
+12_payroll
+101.12.01_oct_payroll
+20-29_admin
+22_contracts
+101.22.01_cleaning_contract
+101.22.02_office_lease"
+            )
+            .unwrap(),
+            System {
+                path: PathBuf::new(),
+                id: vec![
+                    JdNumber::new(
+                        "_finance",
+                        "_payroll",
+                        12,
+                        01,
+                        Some(101),
+                        Some("_project_name".to_string()),
+                        "_oct_payroll".to_string(),
+                        PathBuf::new()
+                    )
+                    .unwrap(),
+                    JdNumber::new(
+                        "_admin",
+                        "_contracts",
+                        22,
+                        01,
+                        Some(101),
+                        Some("_project_name".to_string()),
+                        "_cleaning_contract".to_string(),
+                        PathBuf::new()
+                    )
+                    .unwrap(),
+                    JdNumber::new(
+                        "_admin",
+                        "_contracts",
+                        22,
+                        02,
+                        Some(101),
+                        Some("_project_name".to_string()),
+                        "_office_lease".to_string(),
+                        PathBuf::new()
+                    )
+                    .unwrap()
+                ],
+            }
+        );
+
+        assert_eq!(
+            System::parse(
                 "10-19_finance
 12_payroll
 12.01_oct_payroll
@@ -961,5 +1104,7 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
                 ],
             }
         );
+
+        assert!(System::parse("this is some giberish").is_err());
     }
 }
