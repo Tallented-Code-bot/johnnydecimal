@@ -99,6 +99,12 @@ your files and write the index to `<ROOT_FOLDER>/.JdIndex`.
 `jd show`, you could add a new one with `jd add <CATEGORY>`, or you could go to a specific one with
 `j <JD_NUMBER>`(assuming that you added the config to your shell!).
 
+## Index format
+Jd creates an index file called `.JdIndex` in the root of your Johnny Decimal system.
+The format is essentially a plaintext representation of a Johnny decimal system.
+
+### TODO format example here
+
 
 ## Contributing and License
 This project is under the GNU GPL-3 license.  (You can view the license [here](LICENSE).)
