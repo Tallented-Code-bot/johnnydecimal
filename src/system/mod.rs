@@ -157,6 +157,7 @@ impl System {
                 id.expect("Has already been checked to be some."),
                 project,
                 None,
+                None,
                 String::new(),
                 PathBuf::new(),
             )
@@ -278,6 +279,7 @@ impl System {
             number.id + 1,
             number.project,
             number.project_label.clone(),
+            number.project_area_label.clone(),
             title,
             PathBuf::new(),
         ) {
@@ -493,6 +495,7 @@ impl System {
                         id,
                         project,
                         None,
+                        None,
                         label.to_string(),
                         PathBuf::new(),
                     ) {
@@ -533,7 +536,7 @@ impl System {
 
         // iterate through the areas
 
-        for (((project_first, project_last), _project_area_label, _), projects) in project_areas {
+        for (((project_first, project_last), project_area_label, _), projects) in project_areas {
             for ((project, project_label, _), areas) in projects {
                 if !(project_first <= project && project <= project_last) {
                     return Err("Project not between project ranges");
@@ -569,6 +572,7 @@ impl System {
                                 ac,
                                 id,
                                 jd_project,
+                                Some(project_area_label.to_string()),
                                 Some(project_label.to_string()),
                                 label.to_string(),
                                 PathBuf::new(),
@@ -631,6 +635,7 @@ mod tests {
             42,
             None,
             None,
+            None,
             "label".to_string(),
             PathBuf::new(),
         )
@@ -642,6 +647,7 @@ mod tests {
             "cat-labe2",
             60,
             22,
+            None,
             None,
             None,
             "label".to_string(),
@@ -665,6 +671,7 @@ mod tests {
             42,
             None,
             None,
+            None,
             "label".to_string(),
             PathBuf::new(),
         )
@@ -674,6 +681,7 @@ mod tests {
             "cat-lab2",
             60,
             22,
+            None,
             None,
             None,
             "label".to_string(),
@@ -687,6 +695,7 @@ mod tests {
             21,
             None,
             None,
+            None,
             "label_".to_string(),
             PathBuf::new(),
         )
@@ -696,6 +705,7 @@ mod tests {
             "tac",
             10,
             5,
+            None,
             None,
             None,
             "aleb".to_string(),
@@ -843,6 +853,7 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
             01,
             None,
             None,
+            None,
             "_sept_payroll".to_string(),
             PathBuf::from("jd/10-19_finance/12_payroll/12.01_sept_payroll"),
         )
@@ -853,8 +864,18 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
             jd2
         ));
 
-        let jd3 =
-            JdNumber::new("", "", 50, 32, None, None, "l".to_string(), PathBuf::new()).unwrap();
+        let jd3 = JdNumber::new(
+            "",
+            "",
+            50,
+            32,
+            None,
+            None,
+            None,
+            "l".to_string(),
+            PathBuf::new(),
+        )
+        .unwrap();
 
         assert!(system.get_id(jd3).is_err());
     }
@@ -873,6 +894,7 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
                 "_payroll",
                 12,
                 03,
+                None,
                 None,
                 None,
                 "_a_title".to_string(),
@@ -896,6 +918,7 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
                 "_payroll",
                 12,
                 04,
+                None,
                 None,
                 None,
                 "_a_title".to_string(),
@@ -1038,6 +1061,7 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
                         01,
                         Some(101),
                         Some("_project_name".to_string()),
+                        Some("_project_area_name".to_string()),
                         "_oct_payroll".to_string(),
                         PathBuf::new()
                     )
@@ -1049,6 +1073,7 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
                         01,
                         Some(101),
                         Some("_project_name".to_string()),
+                        Some("_project_area_name".to_string()),
                         "_cleaning_contract".to_string(),
                         PathBuf::new()
                     )
@@ -1060,6 +1085,7 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
                         02,
                         Some(101),
                         Some("_project_name".to_string()),
+                        Some("_project_area_name".to_string()),
                         "_office_lease".to_string(),
                         PathBuf::new()
                     )
@@ -1089,6 +1115,7 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
                         01,
                         None,
                         None,
+                        None,
                         "_oct_payroll".to_string(),
                         PathBuf::new()
                     )
@@ -1100,6 +1127,7 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
                         01,
                         None,
                         None,
+                        None,
                         "_cleaning_contract".to_string(),
                         PathBuf::new()
                     )
@@ -1109,6 +1137,7 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
                         "_contracts",
                         22,
                         02,
+                        None,
                         None,
                         None,
                         "_office_lease".to_string(),

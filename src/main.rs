@@ -176,7 +176,8 @@ fn index(mut filepath: path::PathBuf) {
     filepath.push(".JdIndex");
     fs::write(
         &filepath,
-        ron::ser::to_string_pretty(&system, ron::ser::PrettyConfig::new()).unwrap(),
+        // ron::ser::to_string_pretty(&system, ron::ser::PrettyConfig::new()).unwrap(),
+        system.to_string(),
     )
     .expect("Could not write file");
 
@@ -298,7 +299,8 @@ fn write_index(system: System) -> Result<(), &'static str> {
 
     match fs::write(
         path,
-        ron::ser::to_string_pretty(&system, ron::ser::PrettyConfig::new()).unwrap(),
+        // ron::ser::to_string_pretty(&system, ron::ser::PrettyConfig::new()).unwrap(),
+        system.to_string(),
     ) {
         Ok(_result) => Ok(()),
         Err(_err) => Err("Cannot write to file."),
@@ -311,7 +313,8 @@ fn get_system() -> Result<System, &'static str> {
         None => return Err("Not in a valid Johnny Decimal system"),
     };
 
-    let system: System = match ron::from_str(&index) {
+    let system: System = match System::parse(&index) {
+        //ron::from_str(&index) {
         Ok(x) => x,
         Err(_) => return Err("Cannot read index file."),
     };
@@ -340,6 +343,7 @@ fn _search(search: &str) -> Result<JdNumber, &str> {
         category,
         id,
         project,
+        None,
         None,
         "label".to_string(),
         PathBuf::new(),

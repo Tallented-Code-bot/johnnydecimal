@@ -22,6 +22,8 @@ pub struct JdNumber {
     pub project: Option<u32>,
     /// The project label, for example 101**_project_1**
     pub project_label: Option<String>,
+    /// The project category, for example 100-199**_project_area_label**
+    pub project_area_label: Option<String>,
     /// The category, between 0 and 99.
     pub category: u32,
     /// The id, between 0 and 99.
@@ -44,6 +46,7 @@ impl JdNumber {
         id: u32,
         project: Option<u32>,
         project_label: Option<String>,
+        project_area_label: Option<String>,
         label: String,
         path: PathBuf,
     ) -> Result<Self, ()> {
@@ -67,6 +70,7 @@ impl JdNumber {
             id,
             project,
             project_label,
+            project_area_label,
             label,
             area_label: area_label.to_string(),
             category_label: category_label.to_string(),
@@ -177,7 +181,7 @@ impl TryFrom<PathBuf> for JdNumber {
 
         // Initialize variable
         let mut _project_area: Option<(&str, &str)> = None;
-        let mut _project_area_name: Option<&str> = None;
+        let mut project_area_name: Option<&str> = None;
         let mut project_name: Option<&str> = None;
         let mut project: Option<u32> = None;
         let mut area_name: Option<&str> = None;
@@ -197,7 +201,7 @@ impl TryFrom<PathBuf> for JdNumber {
                     _project_area =
                         Some((caps.get(1).unwrap().as_str(), caps.get(2).unwrap().as_str()));
                     // project_area_name = Some(caps.get(3).unwrap().as_str());
-                    _project_area_name = caps.get(3).map(|v| v.as_str());
+                    project_area_name = caps.get(3).map(|v| v.as_str());
                 }
                 None => {}
             }
@@ -270,6 +274,7 @@ impl TryFrom<PathBuf> for JdNumber {
             jd_id.ok_or("Could not find id")?,
             project,
             project_name.map(|p| p.to_string()),
+            project_area_name.map(|p| p.to_string()),
             jd_name.ok_or("Could not find JD name")?.to_string(),
             path_value.clone(),
         ) {
@@ -310,6 +315,7 @@ impl TryFrom<String> for JdNumber {
             category,
             id,
             project,
+            None,
             None,
             "label".to_string(),
             PathBuf::new(),
@@ -439,6 +445,7 @@ mod tests {
             524,
             None,
             None,
+            None,
             "fsd".to_string(),
             PathBuf::new()
         )
@@ -448,6 +455,7 @@ mod tests {
             "fsd",
             43,
             23,
+            None,
             None,
             None,
             "sdf".to_string(),
@@ -461,6 +469,7 @@ mod tests {
             52,
             Some(402),
             Some("hi".to_string()),
+            Some("area_label".to_string()),
             "_goodbye".to_string(),
             PathBuf::new()
         )
@@ -472,6 +481,7 @@ mod tests {
             24,
             Some(2542),
             Some("label".to_string()),
+            Some("project-area-label".to_string()),
             " hello".to_string(),
             PathBuf::new()
         )
@@ -486,6 +496,7 @@ mod tests {
                 id: 35,
                 project: None,
                 project_label: None,
+                project_area_label: None,
                 label: String::from("_test"),
                 category_label: String::from("_good_testing"),
                 area_label: String::from("_testing"),
@@ -499,6 +510,7 @@ mod tests {
                 id: 32,
                 project: None,
                 project_label: None,
+                project_area_label: None,
                 label: String::from("_label"),
                 area_label: String::from("_hi"),
                 category_label: String::from("_bye"),
@@ -515,6 +527,7 @@ mod tests {
                 id: 02,
                 project: Some(102),
                 project_label: Some("_grade-10".to_string()),
+                project_area_label: Some("_school".to_string()),
                 label: String::from("_oreo_project"),
                 category_label: String::from("-ap_biology"),
                 area_label: String::from("_RHS"),
@@ -531,6 +544,7 @@ mod tests {
                 id: 02,
                 project: None,
                 project_label: None,
+                project_area_label: None,
                 label: String::from("_a_payroll"),
                 category_label: String::from("_payroll"),
                 area_label: String::from("_finance"),
@@ -569,6 +583,7 @@ mod tests {
                 42,
                 Some(192),
                 None,
+                None,
                 "j".to_string(),
                 PathBuf::new()
             )
@@ -578,7 +593,18 @@ mod tests {
         // test AC.ID
         assert_eq!(
             JdNumber::try_from(String::from("50.42")).unwrap(),
-            JdNumber::new("", "", 50, 42, None, None, "l".to_string(), PathBuf::new()).unwrap()
+            JdNumber::new(
+                "",
+                "",
+                50,
+                42,
+                None,
+                None,
+                None,
+                "l".to_string(),
+                PathBuf::new()
+            )
+            .unwrap()
         );
 
         // test empty string
@@ -622,6 +648,7 @@ mod tests {
             32,
             None,
             None,
+            None,
             "this_lab".to_string(),
             PathBuf::new(),
         )
@@ -631,6 +658,7 @@ mod tests {
             "diff_cat",
             50,
             32,
+            None,
             None,
             None,
             "diflab".to_string(),
@@ -643,6 +671,7 @@ mod tests {
             "catlabel",
             40,
             33,
+            None,
             None,
             None,
             "a_label".to_string(),
@@ -662,6 +691,7 @@ mod tests {
             32,
             None,
             None,
+            None,
             "here".to_string(),
             PathBuf::new(),
         )
@@ -679,6 +709,7 @@ mod tests {
             32,
             None,
             None,
+            None,
             "here".to_string(),
             PathBuf::new(),
         )
@@ -689,6 +720,7 @@ mod tests {
             "cat_label",
             50,
             32,
+            None,
             None,
             None,
             "here".to_string(),
@@ -703,6 +735,7 @@ mod tests {
             "cat_2_label",
             60,
             32,
+            None,
             None,
             None,
             "here".to_string(),
