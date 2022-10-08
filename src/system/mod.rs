@@ -1,6 +1,6 @@
 use crate::jdnumber::JdNumber;
 use nom::{
-    character::complete::{char, line_ending, not_line_ending, one_of},
+    character::complete::{char, line_ending, multispace0, not_line_ending, one_of},
     combinator::{not, opt, recognize, value},
     multi::{count, many0, many1},
     sequence::{pair, separated_pair, terminated, tuple},
@@ -358,20 +358,24 @@ impl System {
     /// `500-599 Project area`
     fn project_area_line(i: &str) -> IResult<&str, ((u32, u32), &str, ())> {
         tuple((
+            multispace0,
             System::match_project_range,
             not_line_ending,
             System::consume_newline,
         ))(i)
+        .map(|x| (x.0, (x.1 .1, x.1 .2, x.1 .3)))
     }
 
     /// Match a project line;
     /// `501 project`
     fn project_line(i: &str) -> IResult<&str, (u32, &str, ())> {
         tuple((
+            multispace0,
             System::match_project,
             not_line_ending,
             System::consume_newline,
         ))(i)
+        .map(|i| (i.0, (i.1 .1, i.1 .2, i.1 .3))) // don't return the whitespace.
     }
 
     fn match_area_range(input: &str) -> IResult<&str, (u32, u32)> {
@@ -382,10 +386,12 @@ impl System {
     /// `10-19 This is the area name`
     fn area_line(input: &str) -> IResult<&str, ((u32, u32), &str, ())> {
         tuple((
+            multispace0,
             System::match_area_range,
             not_line_ending,
             System::consume_newline,
         ))(input)
+        .map(|i| (i.0, (i.1 .1, i.1 .2, i.1 .3))) // do a mapping so as not to return the space.
     }
 
     /// Parse a Jd line
@@ -394,6 +400,7 @@ impl System {
         input: &str,
     ) -> IResult<&str, (Option<u32>, Option<char>, u32, char, u32, &str, ())> {
         tuple((
+            multispace0,
             opt(System::match_project),
             opt(char('.')),
             System::match_area,
@@ -402,6 +409,12 @@ impl System {
             not_line_ending,
             System::consume_newline,
         ))(input)
+        .map(|i| {
+            (
+                i.0,
+                (i.1 .1, i.1 .2, i.1 .3, i.1 .4, i.1 .5, i.1 .6, i.1 .7),
+            )
+        })
     }
 
     fn consume_newline(i: &str) -> IResult<&str, ()> {
@@ -409,7 +422,8 @@ impl System {
     }
 
     fn category_line(input: &str) -> IResult<&str, (u32, &str, ())> {
-        let (unmatched, ((), area, label, ())) = match tuple((
+        let (unmatched, (_ws, (), area, label, ())) = match tuple((
+            multispace0,
             not(System::match_area_range),
             System::match_area,
             not_line_ending,
@@ -1057,12 +1071,12 @@ id:[(project:None,category:12,id:1,label:"_sept_payroll",area_label:"_finance",c
         assert_eq!(
             System::parse(
                 "10-19_finance
-12_payroll
-12.01_oct_payroll
+    12_payroll
+        12.01_oct_payroll
 20-29_admin
-22_contracts
-22.01_cleaning_contract
-22.02_office_lease"
+    22_contracts
+        22.01_cleaning_contract
+        22.02_office_lease"
             )
             .unwrap(),
             System {
